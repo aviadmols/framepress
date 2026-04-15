@@ -2,7 +2,8 @@
 /**
  * FramePress Elementor Integration
  *
- * Registers one Elementor widget per FramePress section type (e.g. fp-hero, fp-faq).
+ * Registers one Elementor widget per FramePress section type (e.g. fp-hero, fp-faq)
+ * plus the legacy widget `framepress-section` for older saved pages.
  * Optional instance data for blocks / legacy JSON is stored in wp_options as
  * framepress_el_{md5(post_id|elementor_element_id)}.
  *
@@ -64,6 +65,7 @@ class FramePress_Elementor_Integration {
         }
 
         require_once FRAMEPRESS_DIR . 'includes/class-elementor-widget.php';
+        require_once FRAMEPRESS_DIR . 'includes/class-elementor-widget-legacy.php';
 
         $sections = FramePress_Section_Registry::get_instance()->get_all_sections();
         FramePress_Elementor_Section_Widget::set_schemas( $sections );
@@ -78,6 +80,10 @@ class FramePress_Elementor_Integration {
                 continue;
             }
             $manager->register( new FramePress_Elementor_Section_Widget( [], [ 'fp_section_type' => $type ] ) );
+        }
+
+        if ( null === $manager->get_widget_types( 'framepress-section' ) ) {
+            $manager->register( new FramePress_Elementor_Legacy_Section_Widget() );
         }
     }
 }

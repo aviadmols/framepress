@@ -319,6 +319,15 @@ class FramePress_Elementor_Section_Widget extends \Elementor\Widget_Base {
         $type   = $schema['type'] ?? '';
 
         if ( $type === '' ) {
+            if ( \Elementor\Plugin::$instance->editor->is_edit_mode() ) {
+                echo '<div style="padding:20px;background:#f6f6f7;border:2px dashed #c9cccf;border-radius:6px;color:#6d7175;font-family:sans-serif;font-size:13px;line-height:1.5;">'
+                    . '<strong>' . esc_html__( 'FramePress', 'framepress' ) . '</strong><br>'
+                    . esc_html__(
+                        'This block does not match a registered section. Remove it and add a FramePress widget from the panel (e.g. Hero, FAQ), or enable FramePress → Global Settings → Integrations.',
+                        'framepress'
+                    )
+                    . '</div>';
+            }
             return;
         }
 
