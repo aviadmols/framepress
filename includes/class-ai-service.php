@@ -109,7 +109,7 @@ class FramePress_AI_Service {
 
     private function call_anthropic( string $system_prompt, string $user_message ): array|\WP_Error {
         $response = wp_remote_post( 'https://api.anthropic.com/v1/messages', [
-            'timeout' => 30,
+            'timeout' => 120,
             'headers' => [
                 'Content-Type'      => 'application/json',
                 'x-api-key'         => $this->api_key,
@@ -130,7 +130,7 @@ class FramePress_AI_Service {
 
     private function call_openai( string $system_prompt, string $user_message ): array|\WP_Error {
         $response = wp_remote_post( 'https://api.openai.com/v1/chat/completions', [
-            'timeout' => 30,
+            'timeout' => 120,
             'headers' => [
                 'Content-Type'  => 'application/json',
                 'Authorization' => 'Bearer ' . $this->api_key,
@@ -309,6 +309,69 @@ class FramePress_AI_Service {
     }
 
     /**
+     * Fix broken section files using AI.
+     * Sends the broken files + error message back to the LLM and returns corrected files.
+     *
+     * @param array  $files   { schema_php, section_php, style_css, script_js }
+     * @param string $error   The PHP syntax error message returned by install_section_files.
+     * @return array|\WP_Error  { slug, label, schema_php, section_php, style_css, script_js }
+     */
+    public function fix_section_files( array $files, string $error ): array|\WP_Error {
+        if ( ! $this->is_available() ) {
+            return new \WP_Error( 'ai_disabled', __( 'AI is not configured.', 'framepress' ) );
+        }
+        $rate_error = $this->check_rate_limit();
+        if ( is_wp_error( $rate_error ) ) return $rate_error;
+
+        $system = $this->build_section_files_system_prompt();
+
+        $schema_php  = $files['schema_php']  ?? '';
+        $section_php = $files['section_php'] ?? '';
+        $style_css   = $files['style_css']   ?? '';
+        $script_js   = $files['script_js']   ?? '';
+        $slug        = $files['slug']        ?? '';
+        $label       = $files['label']       ?? '';
+
+        $user = <<<MSG
+The following FramePress section files failed PHP syntax validation with this error:
+
+ERROR: {$error}
+
+Please fix ONLY the syntax error and return the corrected files. Do not change the section's structure, fields, or logic — only fix the PHP syntax.
+
+Current files:
+
+### schema.php
+```php
+{$schema_php}
+```
+
+### section.php
+```php
+{$section_php}
+```
+
+### style.css
+```css
+{$style_css}
+```
+
+### script.js
+```js
+{$script_js}
+```
+
+Return ONLY valid JSON with keys: slug, label, schema_php, section_php, style_css, script_js.
+Keep slug="{$slug}" and label="{$label}" unless they need fixing.
+MSG;
+
+        $result = $this->call_api( $system, $user );
+        if ( is_wp_error( $result ) ) return $result;
+
+        return $this->validate_section_files_response( $result );
+    }
+
+    /**
      * Write AI-generated section files to the uploads directory and
      * flush the section registry so the new section is immediately available.
      *
@@ -318,7 +381,7 @@ class FramePress_AI_Service {
      * @param string $style_css
      * @return true|\WP_Error
      */
-    public function install_section_files( string $slug, string $schema_php, string $section_php, string $style_css ): true|\WP_Error {
+    public function install_section_files( string $slug, string $schema_php, string $section_php, string $style_css, string $script_js = '' ): true|\WP_Error {
         $slug = sanitize_title( $slug );
         if ( empty( $slug ) ) {
             return new \WP_Error( 'invalid_slug', __( 'Invalid section slug.', 'framepress' ) );
@@ -379,6 +442,10 @@ class FramePress_AI_Service {
             file_put_contents( $dir . 'style.css', $style_css );
         }
 
+        if ( ! empty( $script_js ) ) {
+            file_put_contents( $dir . 'script.js', $script_js );
+        }
+
         // Bust registry cache so the new section shows up immediately.
         delete_transient( 'framepress_section_registry' );
 
@@ -400,6 +467,7 @@ class FramePress_AI_Service {
             'schema_php'  => (string) $data['schema_php'],
             'section_php' => (string) $data['section_php'],
             'style_css'   => (string) ( $data['style_css'] ?? '' ),
+            'script_js'   => (string) ( $data['script_js']  ?? '' ),
         ];
     }
 
@@ -507,6 +575,15 @@ Return ONLY a single valid JSON object with these keys:
   schema_php  — the PHP return [...] array as a string (no <?php tag)
   section_php — the full section.php template as a string (no <?php tag)
   style_css   — CSS string (empty string "" if no styles needed)
+  script_js   — JavaScript string (empty string "" if no JS needed)
+
+IMPORTANT: If the section needs JavaScript, put ALL JS in script_js (it becomes script.js).
+Do NOT put <script> tags inside section_php. The script_js file is loaded automatically.
+In script_js, always scope to the section element using the section ID:
+  (function() {
+      var root = document.querySelector('[data-fp-id]'); // or use a unique class
+      // your code here
+  })();
 
 No explanations. No markdown. No code fences. Only the JSON object.
 PROMPT;

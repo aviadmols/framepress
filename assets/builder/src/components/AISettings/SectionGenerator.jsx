@@ -12,6 +12,7 @@ const FILE_TABS = [
     { id: 'schema_php',  label: 'schema.php' },
     { id: 'section_php', label: 'section.php' },
     { id: 'style_css',   label: 'style.css' },
+    { id: 'script_js',   label: 'script.js' },
 ];
 
 export default function SectionGenerator() {
@@ -25,12 +26,15 @@ export default function SectionGenerator() {
     const [ error,       setError       ] = useState( '' );
     const [ installed,   setInstalled   ] = useState( false );
     const [ installing,  setInstalling  ] = useState( false );
+    const [ fixing,      setFixing      ] = useState( false );
+    const [ installError, setInstallError ] = useState( '' );
 
     async function generate() {
         setLoading( true );
         setError( '' );
         setResult( null );
         setInstalled( false );
+        setInstallError( '' );
 
         const body = mode === 'html'
             ? { mode: 'html', html, slug }
@@ -57,7 +61,7 @@ export default function SectionGenerator() {
     async function install() {
         if ( ! result ) return;
         setInstalling( true );
-        setError( '' );
+        setInstallError( '' );
 
         try {
             const res  = await fetch( REST() + '/ai/install-section', {
@@ -67,12 +71,35 @@ export default function SectionGenerator() {
             } );
             const data = await res.json();
 
-            if ( data.error ) { setError( data.error ); return; }
+            if ( data.error ) { setInstallError( data.error ); return; }
             setInstalled( true );
         } catch ( e ) {
-            setError( 'Network error: ' + e.message );
+            setInstallError( 'Network error: ' + e.message );
         } finally {
             setInstalling( false );
+        }
+    }
+
+    async function fixWithAI() {
+        if ( ! result || ! installError ) return;
+        setFixing( true );
+        setInstallError( '' );
+
+        try {
+            const res  = await fetch( REST() + '/ai/fix-section-files', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': NONCE() },
+                body:    JSON.stringify( { ...result, error: installError } ),
+            } );
+            const data = await res.json();
+
+            if ( data.error ) { setInstallError( data.error ); return; }
+            setResult( data );
+            setFileTab( 'section_php' );
+        } catch ( e ) {
+            setInstallError( 'Network error: ' + e.message );
+        } finally {
+            setFixing( false );
         }
     }
 
@@ -154,12 +181,25 @@ export default function SectionGenerator() {
                             <button
                                 className="fp-sg__install-btn"
                                 onClick={ install }
-                                disabled={ installing }
+                                disabled={ installing || fixing }
                             >
                                 { installing ? 'Installing…' : '↓ Install Section' }
                             </button>
                         ) }
                     </div>
+
+                    { installError && (
+                        <div className="fp-sg__install-error">
+                            <span className="fp-sg__install-error-msg">{ installError }</span>
+                            <button
+                                className="fp-sg__fix-btn"
+                                onClick={ fixWithAI }
+                                disabled={ fixing }
+                            >
+                                { fixing ? 'Fixing…' : '✦ Fix with AI' }
+                            </button>
+                        </div>
+                    ) }
 
                     {/* File tabs */}
                     <div className="fp-sg__file-tabs">

@@ -924,6 +924,176 @@
     gap: 4px;
 }
 
+/* ── Section Generator: install error + fix button ──────────────────────── */
+
+.fp-sg__install-error {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    background: #fff4f4;
+    border-left: 3px solid #d72c0d;
+    margin: 0;
+    flex-wrap: wrap;
+}
+
+.fp-sg__install-error-msg {
+    font-size: 12px;
+    color: #d72c0d;
+    flex: 1;
+    font-family: 'Fira Code', Consolas, monospace;
+}
+
+.fp-sg__fix-btn {
+    padding: 6px 14px;
+    background: #8a5cf6;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s;
+}
+.fp-sg__fix-btn:hover:not(:disabled) { background: #6d3fd8; }
+.fp-sg__fix-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Sections Manager ────────────────────────────────────────────────────── */
+
+.fp-sm {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 32px 24px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.fp-sm__header { margin-bottom: 24px; }
+.fp-sm__title  { font-size: 20px; font-weight: 700; color: #202223; margin: 0 0 4px; }
+.fp-sm__subtitle { font-size: 13px; color: #6d7175; margin: 0; }
+
+.fp-sm__loading,
+.fp-sm__empty { font-size: 13px; color: #6d7175; padding: 16px 0; }
+
+.fp-sm__list { display: flex; flex-direction: column; gap: 8px; }
+
+.fp-sm__item {
+    border: 1px solid #e1e3e5;
+    border-radius: 8px;
+    background: #fff;
+    overflow: hidden;
+    transition: border-color 0.15s;
+}
+.fp-sm__item.open { border-color: #2c6ecb; }
+
+.fp-sm__row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.1s;
+}
+.fp-sm__row:hover { background: #f6f6f7; }
+
+.fp-sm__row-left  { display: flex; align-items: center; gap: 10px; }
+.fp-sm__row-right { display: flex; align-items: center; gap: 10px; }
+
+.fp-sm__source-badge {
+    font-size: 10px;
+    font-weight: 700;
+    color: #fff;
+    padding: 2px 8px;
+    border-radius: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.fp-sm__label { font-size: 14px; font-weight: 600; color: #202223; }
+.fp-sm__slug  { font-size: 11px; color: #6d7175; font-family: 'Fira Code', Consolas, monospace; background: #f6f6f7; padding: 2px 6px; border-radius: 4px; }
+
+.fp-sm__usage-count { font-size: 11px; color: #6d7175; }
+.fp-sm__chevron     { font-size: 11px; color: #8c9196; }
+
+.fp-sm__panel {
+    border-top: 1px solid #e1e3e5;
+    background: #fafbfb;
+}
+
+.fp-sm__usage {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 10px 16px;
+    border-bottom: 1px solid #e1e3e5;
+    font-size: 12px;
+}
+
+.fp-sm__usage-label { color: #6d7175; font-weight: 600; }
+.fp-sm__usage-link  { color: #2c6ecb; text-decoration: none; }
+.fp-sm__usage-link:hover { text-decoration: underline; }
+
+.fp-sm__file-tabs {
+    display: flex;
+    border-bottom: 1px solid #e1e3e5;
+    background: #f6f6f7;
+}
+
+.fp-sm__file-tab {
+    padding: 8px 16px;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    font-size: 12px;
+    font-family: 'Fira Code', Consolas, monospace;
+    color: #6d7175;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+}
+.fp-sm__file-tab.active { color: #202223; border-bottom-color: #2c6ecb; background: #fff; }
+
+.fp-sm__code-editor {
+    display: block;
+    width: 100%;
+    min-height: 320px;
+    padding: 16px 20px;
+    font-size: 12px;
+    font-family: 'Fira Code', Consolas, monospace;
+    line-height: 1.6;
+    color: #202223;
+    background: #fff;
+    border: none;
+    resize: vertical;
+    outline: none;
+    tab-size: 4;
+}
+.fp-sm__code-editor.readonly { background: #fafbfb; color: #6d7175; cursor: default; }
+
+.fp-sm__readonly-note {
+    font-size: 12px;
+    color: #8c9196;
+    padding: 8px 16px 12px;
+    margin: 0;
+    font-style: italic;
+}
+
+.fp-sm__error {
+    font-size: 12px;
+    color: #d72c0d;
+    padding: 8px 16px;
+    margin: 0;
+}
+
+.fp-sm__actions {
+    padding: 12px 16px;
+    border-top: 1px solid #e1e3e5;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
 /* ── Scrollbars ──────────────────────────────────────────────────────────── */
 
 ::-webkit-scrollbar { width: 6px; height: 6px; }

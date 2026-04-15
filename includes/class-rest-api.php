@@ -111,6 +111,20 @@ class FramePress_Rest_API {
             'args'                => [ 'type' => [ 'sanitize_callback' => 'sanitize_title' ] ],
         ] );
 
+        // ── Sections manager ──────────────────────────────────────────────────
+        // List all sections with usage info.
+        register_rest_route( self::NS, '/sections-manager/list', [
+            'methods'             => 'GET',
+            'callback'            => [ $this, 'sections_manager_list' ],
+            'permission_callback' => [ $this, 'admin_permission' ],
+        ] );
+
+        // Read / write section files (uploads sections only for writes).
+        register_rest_route( self::NS, '/sections-manager/(?P<type>[a-z0-9\-]+)/files', [
+            [ 'methods' => 'GET',  'callback' => [ $this, 'get_section_files' ],  'permission_callback' => [ $this, 'admin_permission' ] ],
+            [ 'methods' => 'POST', 'callback' => [ $this, 'save_section_files' ], 'permission_callback' => [ $this, 'admin_permission' ] ],
+        ] );
+
         // ── AI endpoints ──────────────────────────────────────────────────────
         register_rest_route( self::NS, '/ai/generate-section', [
             'methods'             => 'POST',
@@ -134,6 +148,13 @@ class FramePress_Rest_API {
         register_rest_route( self::NS, '/ai/generate-section-files', [
             'methods'             => 'POST',
             'callback'            => [ $this, 'ai_generate_section_files' ],
+            'permission_callback' => [ $this, 'admin_permission' ],
+        ] );
+
+        // Fix broken AI-generated section files using AI.
+        register_rest_route( self::NS, '/ai/fix-section-files', [
+            'methods'             => 'POST',
+            'callback'            => [ $this, 'ai_fix_section_files' ],
             'permission_callback' => [ $this, 'admin_permission' ],
         ] );
 
@@ -480,6 +501,35 @@ class FramePress_Rest_API {
     }
 
     /**
+     * Fix broken AI-generated section files and return corrected versions.
+     */
+    public function ai_fix_section_files( \WP_REST_Request $request ): \WP_REST_Response {
+        $body  = $request->get_json_params();
+        $error = sanitize_text_field( $body['error'] ?? '' );
+        $files = [
+            'slug'        => sanitize_title( $body['slug']        ?? '' ),
+            'label'       => sanitize_text_field( $body['label']  ?? '' ),
+            'schema_php'  => (string) ( $body['schema_php']       ?? '' ),
+            'section_php' => (string) ( $body['section_php']      ?? '' ),
+            'style_css'   => (string) ( $body['style_css']        ?? '' ),
+            'script_js'   => (string) ( $body['script_js']        ?? '' ),
+        ];
+
+        if ( empty( $error ) || empty( $files['section_php'] ) ) {
+            return new \WP_REST_Response( [ 'error' => 'error message and section_php are required' ], 400 );
+        }
+
+        $ai     = new FramePress_AI_Service();
+        $result = $ai->fix_section_files( $files, $error );
+
+        if ( is_wp_error( $result ) ) {
+            return new \WP_REST_Response( [ 'error' => $result->get_error_message() ], 500 );
+        }
+
+        return rest_ensure_response( $result );
+    }
+
+    /**
      * Install previously-generated section files to the uploads directory.
      */
     public function ai_install_section( \WP_REST_Request $request ): \WP_REST_Response {
@@ -488,19 +538,170 @@ class FramePress_Rest_API {
         $schema_php  = (string) ( $body['schema_php']  ?? '' );
         $section_php = (string) ( $body['section_php'] ?? '' );
         $style_css   = (string) ( $body['style_css']   ?? '' );
+        $script_js   = (string) ( $body['script_js']   ?? '' );
 
         if ( ! $slug || ! $schema_php || ! $section_php ) {
             return new \WP_REST_Response( [ 'error' => 'slug, schema_php and section_php are required' ], 400 );
         }
 
         $ai     = new FramePress_AI_Service();
-        $result = $ai->install_section_files( $slug, $schema_php, $section_php, $style_css );
+        $result = $ai->install_section_files( $slug, $schema_php, $section_php, $style_css, $script_js );
 
         if ( is_wp_error( $result ) ) {
             return new \WP_REST_Response( [ 'error' => $result->get_error_message() ], 500 );
         }
 
         return rest_ensure_response( [ 'success' => true, 'slug' => $slug ] );
+    }
+
+    // ─── Sections Manager ─────────────────────────────────────────────────────
+
+    /**
+     * GET /sections-manager/list
+     * Returns all registered sections with source, file list, and usage (pages/header/footer).
+     */
+    public function sections_manager_list(): \WP_REST_Response {
+        $schemas = $this->section_registry->get_all_sections();
+
+        // Collect usage: pages
+        $page_usage = [];
+        $pages = get_posts( [
+            'post_type'   => 'any',
+            'post_status' => 'any',
+            'numberposts' => -1,
+            'meta_key'    => '_framepress_sections',
+        ] );
+        foreach ( $pages as $post ) {
+            $raw = get_post_meta( $post->ID, '_framepress_sections', true );
+            if ( ! $raw ) continue;
+            $instances = json_decode( $raw, true );
+            if ( ! is_array( $instances ) ) continue;
+            foreach ( $instances as $inst ) {
+                $type = $inst['type'] ?? '';
+                if ( $type ) {
+                    $page_usage[ $type ][] = [ 'id' => $post->ID, 'title' => get_the_title( $post ), 'edit_url' => admin_url( 'admin.php?page=framepress&post_id=' . $post->ID . '&context=page' ) ];
+                }
+            }
+        }
+
+        // Collect usage: header / footer
+        $header_types = [];
+        $raw = get_option( 'framepress_header', '[]' );
+        foreach ( json_decode( $raw, true ) ?: [] as $inst ) {
+            if ( ! empty( $inst['type'] ) ) $header_types[] = $inst['type'];
+        }
+        $footer_types = [];
+        $raw = get_option( 'framepress_footer', '[]' );
+        foreach ( json_decode( $raw, true ) ?: [] as $inst ) {
+            if ( ! empty( $inst['type'] ) ) $footer_types[] = $inst['type'];
+        }
+
+        $result = [];
+        foreach ( $schemas as $schema ) {
+            $type   = $schema['type'];
+            $path   = trailingslashit( $schema['_path'] ?? '' );
+            $source = $schema['source'] ?? 'plugin';
+
+            // Detect which files exist.
+            $files = [];
+            foreach ( [ 'schema.php', 'section.php', 'style.css', 'script.js' ] as $f ) {
+                if ( file_exists( $path . $f ) ) $files[] = $f;
+            }
+
+            $usage = $page_usage[ $type ] ?? [];
+            if ( in_array( $type, $header_types, true ) ) $usage[] = [ 'id' => 0, 'title' => 'Header', 'edit_url' => admin_url( 'admin.php?page=framepress&context=header' ) ];
+            if ( in_array( $type, $footer_types, true ) ) $usage[] = [ 'id' => 0, 'title' => 'Footer', 'edit_url' => admin_url( 'admin.php?page=framepress&context=footer' ) ];
+
+            $result[] = [
+                'type'     => $type,
+                'label'    => $schema['label'] ?? $type,
+                'category' => $schema['category'] ?? '',
+                'source'   => $source,
+                'files'    => $files,
+                'usage'    => $usage,
+                'editable' => $source === 'uploads',
+            ];
+        }
+
+        return rest_ensure_response( $result );
+    }
+
+    /**
+     * GET /sections-manager/{type}/files
+     * Returns the raw file contents for a section type.
+     */
+    public function get_section_files( \WP_REST_Request $request ): \WP_REST_Response {
+        $type   = sanitize_title( $request->get_param( 'type' ) );
+        $schema = $this->section_registry->get_section( $type );
+        if ( ! $schema ) {
+            return new \WP_REST_Response( [ 'error' => 'Section not found' ], 404 );
+        }
+
+        $path  = trailingslashit( $schema['_path'] );
+        $files = [];
+        foreach ( [ 'schema.php', 'section.php', 'style.css', 'script.js' ] as $f ) {
+            $full = $path . $f;
+            if ( file_exists( $full ) ) {
+                $files[ $f ] = file_get_contents( $full );
+            }
+        }
+
+        return rest_ensure_response( [
+            'type'     => $type,
+            'source'   => $schema['source'] ?? 'plugin',
+            'editable' => ( $schema['source'] ?? '' ) === 'uploads',
+            'files'    => $files,
+        ] );
+    }
+
+    /**
+     * POST /sections-manager/{type}/files
+     * Saves updated file contents — only allowed for uploads sections.
+     */
+    public function save_section_files( \WP_REST_Request $request ): \WP_REST_Response {
+        $type   = sanitize_title( $request->get_param( 'type' ) );
+        $schema = $this->section_registry->get_section( $type );
+        if ( ! $schema ) {
+            return new \WP_REST_Response( [ 'error' => 'Section not found' ], 404 );
+        }
+
+        if ( ( $schema['source'] ?? '' ) !== 'uploads' ) {
+            return new \WP_REST_Response( [ 'error' => 'Only user-uploaded sections can be edited.' ], 403 );
+        }
+
+        $body  = $request->get_json_params();
+        $files = $body['files'] ?? [];
+        $path  = trailingslashit( $schema['_path'] );
+
+        $allowed = [ 'schema.php', 'section.php', 'style.css', 'script.js' ];
+        foreach ( $allowed as $filename ) {
+            if ( ! isset( $files[ $filename ] ) ) continue;
+            $content = (string) $files[ $filename ];
+
+            // PHP syntax check for PHP files.
+            if ( substr( $filename, -4 ) === '.php' ) {
+                try {
+                    token_get_all( $content, TOKEN_PARSE );
+                } catch ( \ParseError $e ) {
+                    return new \WP_REST_Response( [ 'error' => "Syntax error in $filename: " . $e->getMessage() ], 400 );
+                }
+                // Block unsafe constructs in schema.php.
+                if ( $filename === 'schema.php' && preg_match( '/\b(include|require|eval|exec|system|passthru|shell_exec)\s*[(\s]/i', $content ) ) {
+                    return new \WP_REST_Response( [ 'error' => 'schema.php contains unsafe PHP constructs.' ], 400 );
+                }
+            }
+
+            if ( file_put_contents( $path . $filename, $content ) === false ) {
+                return new \WP_REST_Response( [ 'error' => "Could not write $filename" ], 500 );
+            }
+        }
+
+        // Bust registry cache if schema.php was updated.
+        if ( isset( $files['schema.php'] ) ) {
+            delete_transient( 'framepress_section_registry' );
+        }
+
+        return rest_ensure_response( [ 'success' => true ] );
     }
 
     // ─── Sanitisation helpers ─────────────────────────────────────────────────
