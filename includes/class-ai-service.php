@@ -347,6 +347,27 @@ class FramePress_AI_Service {
             return new \WP_Error( 'unsafe_schema', __( 'AI-generated schema contains unsafe PHP constructs.', 'framepress' ) );
         }
 
+        // Validate PHP syntax before writing to disk. token_get_all() with TOKEN_PARSE
+        // throws a ParseError on syntax errors (PHP 7.0+). This prevents installing
+        // broken files that would cause a WordPress fatal error on every page load.
+        $syntax_check = static function ( string $content, string $filename ): ?\WP_Error {
+            try {
+                token_get_all( $content, TOKEN_PARSE );
+            } catch ( \ParseError $e ) {
+                return new \WP_Error(
+                    'syntax_error',
+                    sprintf( 'PHP syntax error in %s: %s', $filename, $e->getMessage() )
+                );
+            }
+            return null;
+        };
+
+        $err = $syntax_check( $schema_content, 'schema.php' );
+        if ( $err ) return $err;
+
+        $err = $syntax_check( $section_content, 'section.php' );
+        if ( $err ) return $err;
+
         if ( file_put_contents( $dir . 'schema.php', $schema_content ) === false ) {
             return new \WP_Error( 'write_failed', __( 'Could not write schema.php — check uploads directory permissions.', 'framepress' ) );
         }
