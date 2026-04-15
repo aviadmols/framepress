@@ -16,7 +16,17 @@ defined( 'ABSPATH' ) || exit;
 
 class FramePress_Elementor_Integration {
 
+    private const WIDGET_NAME = 'framepress-section';
+
+    /** @var bool */
+    private static $initialized = false;
+
     public static function init(): void {
+        if ( self::$initialized ) {
+            return;
+        }
+        self::$initialized = true;
+
         add_action( 'elementor/elements/categories_registered', [ __CLASS__, 'register_category' ] );
         add_action( 'elementor/widgets/register', [ __CLASS__, 'register_widget' ] );
     }
@@ -27,19 +37,40 @@ class FramePress_Elementor_Integration {
      * @param mixed $elements_manager \Elementor\Elements_Manager
      */
     public static function register_category( $elements_manager ): void {
-        $elements_manager->add_category(
-            'framepress',
-            [
-                'title' => __( 'FramePress', 'framepress' ),
-                'icon'  => 'fa fa-plug',
-            ]
-        );
+        if ( ! is_object( $elements_manager ) || ! method_exists( $elements_manager, 'add_category' ) ) {
+            return;
+        }
+
+        try {
+            $elements_manager->add_category(
+                'framepress',
+                [
+                    'title' => __( 'FramePress', 'framepress' ),
+                    'icon'  => 'fa fa-plug',
+                ]
+            );
+        } catch ( \Throwable $e ) {
+            if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+                // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+                error_log( 'FramePress: Elementor add_category failed: ' . $e->getMessage() );
+            }
+        }
     }
 
     /**
-     * @param mixed $manager \Elementor\Widgets_Manager
+     * @param \Elementor\Widgets_Manager $manager
      */
     public static function register_widget( $manager ): void {
+        if ( ! is_object( $manager ) || ! method_exists( $manager, 'get_widget_types' ) ) {
+            return;
+        }
+
+        // Avoid duplicate registration if hook runs more than once (e.g. Elementor 4 editor flows).
+        $existing = $manager->get_widget_types( self::WIDGET_NAME );
+        if ( null !== $existing ) {
+            return;
+        }
+
         require_once FRAMEPRESS_DIR . 'includes/class-elementor-widget.php';
         $manager->register( new FramePress_Elementor_Widget() );
     }

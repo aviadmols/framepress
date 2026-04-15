@@ -164,11 +164,16 @@ add_action( 'plugins_loaded', [ FramePress::class, 'get_instance' ] );
  * that action would miss registration; we catch that via `did_action` on `plugins_loaded`.
  */
 function framepress_bootstrap_elementor(): void {
+    static $done = false;
+    if ( $done ) {
+        return;
+    }
     if ( ! class_exists( '\Elementor\Plugin' ) ) {
         return;
     }
     require_once FRAMEPRESS_DIR . 'includes/class-elementor-integration.php';
     FramePress_Elementor_Integration::init();
+    $done = true;
 }
 
 add_action(
