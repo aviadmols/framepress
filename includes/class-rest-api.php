@@ -123,6 +123,26 @@ class FramePress_Rest_API {
             'callback'            => [ $this, 'ai_generate_page' ],
             'permission_callback' => [ $this, 'editor_permission' ],
         ] );
+
+        // AI provider settings (GET = load, POST = save).
+        register_rest_route( self::NS, '/ai/settings', [
+            [ 'methods' => 'GET',  'callback' => [ $this, 'get_ai_settings' ],  'permission_callback' => [ $this, 'admin_permission' ] ],
+            [ 'methods' => 'POST', 'callback' => [ $this, 'save_ai_settings' ], 'permission_callback' => [ $this, 'admin_permission' ] ],
+        ] );
+
+        // Generate section PHP files from a description or raw HTML.
+        register_rest_route( self::NS, '/ai/generate-section-files', [
+            'methods'             => 'POST',
+            'callback'            => [ $this, 'ai_generate_section_files' ],
+            'permission_callback' => [ $this, 'admin_permission' ],
+        ] );
+
+        // Write AI-generated section files to disk and register them.
+        register_rest_route( self::NS, '/ai/install-section', [
+            'methods'             => 'POST',
+            'callback'            => [ $this, 'ai_install_section' ],
+            'permission_callback' => [ $this, 'admin_permission' ],
+        ] );
     }
 
     // ─── Permission checks ────────────────────────────────────────────────────
@@ -399,6 +419,88 @@ class FramePress_Rest_API {
         }
 
         return rest_ensure_response( [ 'sections' => $clean_sections ] );
+    }
+
+    /** Return current AI settings (key masked). */
+    public function get_ai_settings( \WP_REST_Request $request ): \WP_REST_Response {
+        $has_key = ! empty( get_option( 'framepress_ai_key', '' ) );
+        return rest_ensure_response( [
+            'provider' => get_option( 'framepress_ai_provider', 'anthropic' ),
+            'model'    => get_option( 'framepress_ai_model', '' ),
+            'enabled'  => (bool) get_option( 'framepress_ai_enabled', false ),
+            'has_key'  => $has_key,
+        ] );
+    }
+
+    /** Save AI settings. API key is only updated when a non-empty value is sent. */
+    public function save_ai_settings( \WP_REST_Request $request ): \WP_REST_Response {
+        $body = $request->get_json_params();
+
+        update_option( 'framepress_ai_provider', sanitize_key( $body['provider'] ?? 'anthropic' ) );
+        update_option( 'framepress_ai_model',    sanitize_text_field( $body['model'] ?? '' ) );
+        update_option( 'framepress_ai_enabled',  ! empty( $body['enabled'] ) ? 1 : 0 );
+
+        $plain_key = trim( (string) ( $body['api_key'] ?? '' ) );
+        if ( $plain_key !== '' ) {
+            update_option( 'framepress_ai_key', FramePress_AI_Service::encrypt_api_key( $plain_key ) );
+        }
+
+        return rest_ensure_response( [ 'success' => true ] );
+    }
+
+    /**
+     * Generate section PHP files from a description OR raw HTML.
+     * Returns the file contents as strings for preview before install.
+     */
+    public function ai_generate_section_files( \WP_REST_Request $request ): \WP_REST_Response {
+        $body = $request->get_json_params();
+        $mode = sanitize_key( $body['mode'] ?? 'description' ); // 'description' | 'html'
+        $ai   = new FramePress_AI_Service();
+
+        if ( $mode === 'html' ) {
+            $html   = wp_kses_post( $body['html'] ?? '' );
+            $slug   = sanitize_title( $body['slug'] ?? '' );
+            if ( empty( $html ) ) {
+                return new \WP_REST_Response( [ 'error' => 'html is required' ], 400 );
+            }
+            $result = $ai->generate_section_from_html( $html, $slug );
+        } else {
+            $description = sanitize_textarea_field( $body['description'] ?? '' );
+            if ( empty( $description ) ) {
+                return new \WP_REST_Response( [ 'error' => 'description is required' ], 400 );
+            }
+            $result = $ai->generate_section_from_description( $description );
+        }
+
+        if ( is_wp_error( $result ) ) {
+            return new \WP_REST_Response( [ 'error' => $result->get_error_message() ], 500 );
+        }
+
+        return rest_ensure_response( $result );
+    }
+
+    /**
+     * Install previously-generated section files to the uploads directory.
+     */
+    public function ai_install_section( \WP_REST_Request $request ): \WP_REST_Response {
+        $body        = $request->get_json_params();
+        $slug        = sanitize_title( $body['slug'] ?? '' );
+        $schema_php  = (string) ( $body['schema_php']  ?? '' );
+        $section_php = (string) ( $body['section_php'] ?? '' );
+        $style_css   = (string) ( $body['style_css']   ?? '' );
+
+        if ( ! $slug || ! $schema_php || ! $section_php ) {
+            return new \WP_REST_Response( [ 'error' => 'slug, schema_php and section_php are required' ], 400 );
+        }
+
+        $ai     = new FramePress_AI_Service();
+        $result = $ai->install_section_files( $slug, $schema_php, $section_php, $style_css );
+
+        if ( is_wp_error( $result ) ) {
+            return new \WP_REST_Response( [ 'error' => $result->get_error_message() ], 500 );
+        }
+
+        return rest_ensure_response( [ 'success' => true, 'slug' => $slug ] );
     }
 
     // ─── Sanitisation helpers ─────────────────────────────────────────────────

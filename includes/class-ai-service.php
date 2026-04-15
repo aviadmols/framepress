@@ -253,7 +253,205 @@ class FramePress_AI_Service {
         }
     }
 
+    // ─── Section file generation (AI → PHP files) ────────────────────────────
+
+    /**
+     * Generate FramePress section files (schema.php, section.php, style.css)
+     * from a natural language description.
+     *
+     * @param string $description  What the section should do/look like.
+     * @return array|\WP_Error     { slug, label, schema_php, section_php, style_css }
+     */
+    public function generate_section_from_description( string $description ): array|\WP_Error {
+        if ( ! $this->is_available() ) {
+            return new \WP_Error( 'ai_disabled', __( 'AI is not configured.', 'framepress' ) );
+        }
+        $rate_error = $this->check_rate_limit();
+        if ( is_wp_error( $rate_error ) ) return $rate_error;
+
+        $system = $this->build_section_files_system_prompt();
+        $user   = "Create a FramePress section for: {$description}\n\n"
+                . "Return ONLY valid JSON with keys: slug, label, schema_php, section_php, style_css.";
+
+        $result = $this->call_api( $system, $user );
+        if ( is_wp_error( $result ) ) return $result;
+
+        return $this->validate_section_files_response( $result );
+    }
+
+    /**
+     * Convert raw HTML into FramePress section files.
+     *
+     * @param string $html   The raw HTML to analyse and convert.
+     * @param string $slug   Optional suggested slug (user-supplied).
+     * @return array|\WP_Error  { slug, label, schema_php, section_php, style_css }
+     */
+    public function generate_section_from_html( string $html, string $slug = '' ): array|\WP_Error {
+        if ( ! $this->is_available() ) {
+            return new \WP_Error( 'ai_disabled', __( 'AI is not configured.', 'framepress' ) );
+        }
+        $rate_error = $this->check_rate_limit();
+        if ( is_wp_error( $rate_error ) ) return $rate_error;
+
+        $system = $this->build_section_files_system_prompt();
+        $slug_hint = $slug ? "Suggested slug: {$slug}\n\n" : '';
+        $user = "Convert this HTML into a FramePress section.\n\n"
+              . $slug_hint
+              . "HTML:\n```html\n{$html}\n```\n\n"
+              . "Identify all variable parts (text, images, colours, links) and turn them into schema settings. "
+              . "Hard-code structural HTML; parameterise content.\n\n"
+              . "Return ONLY valid JSON with keys: slug, label, schema_php, section_php, style_css.";
+
+        $result = $this->call_api( $system, $user );
+        if ( is_wp_error( $result ) ) return $result;
+
+        return $this->validate_section_files_response( $result );
+    }
+
+    /**
+     * Write AI-generated section files to the uploads directory and
+     * flush the section registry so the new section is immediately available.
+     *
+     * @param string $slug
+     * @param string $schema_php
+     * @param string $section_php
+     * @param string $style_css
+     * @return true|\WP_Error
+     */
+    public function install_section_files( string $slug, string $schema_php, string $section_php, string $style_css ): true|\WP_Error {
+        $slug = sanitize_title( $slug );
+        if ( empty( $slug ) ) {
+            return new \WP_Error( 'invalid_slug', __( 'Invalid section slug.', 'framepress' ) );
+        }
+
+        // Safety: PHP files must not be executable from the uploads dir — our
+        // .htaccess blocks direct PHP requests, but verify the path is correct.
+        $dir = trailingslashit( wp_upload_dir()['basedir'] ) . 'framepress/sections/' . $slug . '/';
+
+        if ( ! wp_mkdir_p( $dir ) ) {
+            return new \WP_Error( 'mkdir_failed', __( 'Could not create section directory.', 'framepress' ) );
+        }
+
+        // Strip any <?php opening tag the AI might have included before we add our own.
+        $strip_open = static function ( string $php ): string {
+            return ltrim( preg_replace( '/^<\?php\s*/i', '', trim( $php ) ) );
+        };
+
+        $schema_content  = "<?php\ndefined( 'ABSPATH' ) || exit;\n\nreturn " . $strip_open( $schema_php );
+        $section_content = "<?php\ndefined( 'ABSPATH' ) || exit;\n\n" . $strip_open( $section_php );
+
+        // Validate schema is syntactically safe (no function calls, no includes).
+        if ( preg_match( '/\b(include|require|eval|exec|system|passthru|shell_exec|popen|proc_open)\s*[(\s]/i', $schema_php ) ) {
+            return new \WP_Error( 'unsafe_schema', __( 'AI-generated schema contains unsafe PHP constructs.', 'framepress' ) );
+        }
+
+        file_put_contents( $dir . 'schema.php',  $schema_content );
+        file_put_contents( $dir . 'section.php', $section_content );
+
+        if ( ! empty( $style_css ) ) {
+            file_put_contents( $dir . 'style.css', $style_css );
+        }
+
+        // Bust registry cache so the new section shows up immediately.
+        delete_transient( 'framepress_section_registry' );
+
+        return true;
+    }
+
+    // ─── Validation for file generation ──────────────────────────────────────
+
+    private function validate_section_files_response( array $data ): array|\WP_Error {
+        $required = [ 'slug', 'schema_php', 'section_php' ];
+        foreach ( $required as $key ) {
+            if ( empty( $data[ $key ] ) ) {
+                return new \WP_Error( 'missing_key', sprintf( __( 'AI response missing required key: %s', 'framepress' ), $key ) );
+            }
+        }
+        return [
+            'slug'        => sanitize_title( $data['slug'] ),
+            'label'       => sanitize_text_field( $data['label'] ?? $data['slug'] ),
+            'schema_php'  => (string) $data['schema_php'],
+            'section_php' => (string) $data['section_php'],
+            'style_css'   => (string) ( $data['style_css'] ?? '' ),
+        ];
+    }
+
     // ─── System prompt builders ───────────────────────────────────────────────
+
+    /**
+     * The master system prompt for section file generation.
+     * Embedded directly so every AI call for section creation uses the exact same rules.
+     */
+    private function build_section_files_system_prompt(): string {
+        return <<<'PROMPT'
+You are building PHP section files for a WordPress plugin called FramePress.
+FramePress works exactly like Shopify Themes — each section is a folder with two required files:
+  schema.php   — returns a PHP array describing the section's fields and metadata.
+  section.php  — receives $settings, $blocks, $section and outputs HTML.
+
+══ RULES ══════════════════════════════════════════════════════════════════════
+
+1. schema.php must `return [...]` — never echo, never execute, pure data only.
+2. section.php receives exactly three variables:
+     $settings  — merged field values (associative array)
+     $blocks    — array of block instances
+     $section   — array with keys: id, type, source
+3. Every output in section.php must be escaped: esc_html(), esc_url(), wp_kses_post().
+4. Use CSS custom properties for theming:
+     --fp-color-primary, --fp-color-secondary, --fp-color-text, --fp-color-background
+     --fp-section-padding-v, --fp-section-padding-h, --fp-container-width, --fp-gap
+     --fp-font-body, --fp-font-heading, --fp-btn-radius
+5. Wrap all section HTML in a single root element — the outer #framepress-section-{id} wrapper is added automatically, do NOT add it yourself.
+6. style.css is optional — include it if the section needs non-trivial CSS. Use the section type as a BEM namespace (e.g. .fp-hero__title). Never use inline <style> tags inside section.php.
+7. All sections must be responsive (mobile-first, CSS Grid or Flexbox).
+8. DO NOT output <?php opening tags — they will be added automatically.
+
+══ SCHEMA FIELD TYPES ═════════════════════════════════════════════════════════
+
+text | textarea | richtext | image (returns URL string)
+select  → requires options: [{value, label}]
+checkbox | color
+number  → supports min, max
+range   → requires min, max, step
+url
+
+══ SCHEMA STRUCTURE ═══════════════════════════════════════════════════════════
+
+return [
+    'type'     => 'section-slug',       // kebab-case, unique
+    'label'    => 'Human Label',
+    'category' => 'content',            // content | layout | media | header | footer
+    'contexts' => ['page'],             // page | header | footer | any
+    'settings' => [
+        ['id' => 'field_id', 'type' => 'text', 'label' => 'Label', 'default' => 'value'],
+    ],
+    'blocks' => [
+        'allowed' => ['button'],        // block type slugs, or [] for no blocks
+        'max'     => 3,
+    ],
+];
+
+══ BLOCK INSTANCE STRUCTURE (in section.php) ══════════════════════════════════
+
+foreach ($blocks as $block) {
+    // $block['type']               — e.g. 'button'
+    // $block['settings']['label']  — text
+    // $block['settings']['url']    — URL
+    // $block['settings']['style']  — 'primary' | 'outline'
+}
+
+══ OUTPUT FORMAT ══════════════════════════════════════════════════════════════
+
+Return ONLY a single valid JSON object with these keys:
+  slug        — kebab-case section type (e.g. "testimonials-grid")
+  label       — human-readable name (e.g. "Testimonials Grid")
+  schema_php  — the PHP return [...] array as a string (no <?php tag)
+  section_php — the full section.php template as a string (no <?php tag)
+  style_css   — CSS string (empty string "" if no styles needed)
+
+No explanations. No markdown. No code fences. Only the JSON object.
+PROMPT;
+    }
 
     private function build_section_system_prompt( array $schema ): string {
         $fields_desc = implode( "\n", array_map( static function ( array $f ): string {

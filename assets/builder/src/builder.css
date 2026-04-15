@@ -680,6 +680,249 @@
 
 .fp-settings-empty { color: #8c9196; font-size: 12px; text-align: center; padding: 24px 0; }
 
+/* ── AI Settings page ────────────────────────────────────────────────────── */
+
+.fp-ai-page {
+    min-height: 100vh;
+    background: #f6f6f7;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 13px;
+    color: #202223;
+}
+
+.fp-ai-page__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 32px;
+    background: #fff;
+    border-bottom: 1px solid #e1e3e5;
+}
+
+.fp-ai-page__header-left { display: flex; align-items: center; gap: 16px; }
+
+.fp-ai-page__back {
+    color: #6d7175;
+    text-decoration: none;
+    font-size: 12px;
+    font-weight: 500;
+}
+.fp-ai-page__back:hover { color: #202223; }
+
+.fp-ai-page__title { margin: 0; font-size: 18px; font-weight: 700; }
+
+.fp-ai-page__tabs {
+    display: flex;
+    gap: 0;
+    padding: 0 32px;
+    background: #fff;
+    border-bottom: 1px solid #e1e3e5;
+}
+
+.fp-ai-page__tab {
+    padding: 12px 20px;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: #6d7175;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+}
+.fp-ai-page__tab.active { color: #202223; border-bottom-color: #2c6ecb; }
+
+.fp-ai-page__body {
+    max-width: 760px;
+    margin: 32px auto;
+    padding: 0 24px;
+}
+
+/* ── Section Generator ───────────────────────────────────────────────────── */
+
+.fp-sg { display: flex; flex-direction: column; gap: 20px; }
+
+.fp-sg__mode-row { display: flex; gap: 8px; }
+
+.fp-sg__mode-btn {
+    padding: 8px 18px;
+    background: #fff;
+    border: 1px solid #c9cccf;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    color: #6d7175;
+    transition: all 0.15s;
+}
+.fp-sg__mode-btn.active {
+    background: #2c6ecb;
+    border-color: #2c6ecb;
+    color: #fff;
+}
+
+.fp-sg__input-area {
+    background: #fff;
+    border: 1px solid #e1e3e5;
+    border-radius: 8px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.fp-sg__label { font-size: 12px; font-weight: 500; color: #6d7175; }
+
+.fp-sg__slug-row { display: flex; }
+
+.fp-sg__slug-input {
+    width: 240px;
+    padding: 7px 10px;
+    background: #fff;
+    border: 1px solid #c9cccf;
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: 'Fira Code', Consolas, monospace;
+    outline: none;
+    color: #202223;
+}
+.fp-sg__slug-input:focus { border-color: #2c6ecb; box-shadow: 0 0 0 3px rgba(44,110,203,0.12); }
+
+.fp-sg__textarea {
+    width: 100%;
+    padding: 10px 12px;
+    background: #f6f6f7;
+    border: 1px solid #c9cccf;
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: inherit;
+    color: #202223;
+    resize: vertical;
+    outline: none;
+    line-height: 1.5;
+    transition: border-color 0.15s, background 0.15s;
+}
+.fp-sg__textarea:focus { border-color: #2c6ecb; background: #fff; box-shadow: 0 0 0 3px rgba(44,110,203,0.12); }
+.fp-sg__textarea--code { font-family: 'Fira Code', Consolas, monospace; font-size: 12px; }
+
+.fp-sg__generate-btn {
+    align-self: flex-start;
+    padding: 9px 22px;
+    background: #2c6ecb;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.fp-sg__generate-btn:hover:not(:disabled) { background: #1f5aab; }
+.fp-sg__generate-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.fp-sg__error {
+    color: #d72c0d;
+    font-size: 13px;
+    background: #fff4f4;
+    border: 1px solid #fda49a;
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin: 0;
+}
+
+.fp-sg__result {
+    background: #fff;
+    border: 1px solid #e1e3e5;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.fp-sg__result-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    border-bottom: 1px solid #e1e3e5;
+    background: #f6f6f7;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.fp-sg__result-label { font-size: 11px; color: #6d7175; margin-right: 6px; }
+.fp-sg__result-name  { font-size: 14px; font-weight: 700; color: #202223; margin-right: 8px; }
+.fp-sg__result-slug  {
+    font-size: 11px;
+    background: #f0f5ff;
+    color: #2c6ecb;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-family: 'Fira Code', Consolas, monospace;
+}
+
+.fp-sg__install-btn {
+    padding: 8px 20px;
+    background: #008060;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+    white-space: nowrap;
+}
+.fp-sg__install-btn:hover:not(:disabled) { background: #005e45; }
+.fp-sg__install-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.fp-sg__installed-badge {
+    font-size: 12px;
+    font-weight: 600;
+    color: #008060;
+}
+
+.fp-sg__file-tabs {
+    display: flex;
+    border-bottom: 1px solid #e1e3e5;
+    background: #f6f6f7;
+}
+
+.fp-sg__file-tab {
+    padding: 8px 16px;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    font-size: 12px;
+    font-family: 'Fira Code', Consolas, monospace;
+    color: #6d7175;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+}
+.fp-sg__file-tab.active { color: #202223; border-bottom-color: #2c6ecb; background: #fff; }
+
+.fp-sg__code {
+    margin: 0;
+    padding: 16px 20px;
+    font-size: 12px;
+    font-family: 'Fira Code', Consolas, monospace;
+    line-height: 1.6;
+    color: #202223;
+    background: #fff;
+    overflow-x: auto;
+    max-height: 400px;
+    overflow-y: auto;
+    white-space: pre;
+}
+
+.fp-ai-settings-form {
+    background: #fff;
+    border: 1px solid #e1e3e5;
+    border-radius: 8px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
 /* ── Scrollbars ──────────────────────────────────────────────────────────── */
 
 ::-webkit-scrollbar { width: 6px; height: 6px; }
