@@ -158,11 +158,30 @@ add_action( 'switch_theme', function () {
 
 add_action( 'plugins_loaded', [ FramePress::class, 'get_instance' ] );
 
-// Elementor: load integration only when Elementor is active (avoids fatal if plugin missing).
-add_action(
-    'elementor/loaded',
-    static function (): void {
-        require_once FRAMEPRESS_DIR . 'includes/class-elementor-integration.php';
-        FramePress_Elementor_Integration::init();
+/**
+ * Elementor: register widget + category when Elementor is available.
+ * If Elementor loads before FramePress, `elementor/loaded` has already fired — hooking only
+ * that action would miss registration; we catch that via `did_action` on `plugins_loaded`.
+ */
+function framepress_bootstrap_elementor(): void {
+    if ( ! class_exists( '\Elementor\Plugin' ) ) {
+        return;
     }
+    require_once FRAMEPRESS_DIR . 'includes/class-elementor-integration.php';
+    FramePress_Elementor_Integration::init();
+}
+
+add_action(
+    'plugins_loaded',
+    static function (): void {
+        if ( ! class_exists( '\Elementor\Plugin' ) ) {
+            return;
+        }
+        if ( did_action( 'elementor/loaded' ) ) {
+            framepress_bootstrap_elementor();
+            return;
+        }
+        add_action( 'elementor/loaded', 'framepress_bootstrap_elementor', 5 );
+    },
+    20
 );

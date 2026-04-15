@@ -14,7 +14,21 @@ defined( 'ABSPATH' ) || exit;
 class FramePress_Elementor_Integration {
 
     public static function init(): void {
+        add_action( 'elementor/elements/categories_registered', [ __CLASS__, 'register_category' ] );
         add_action( 'elementor/widgets/register', [ __CLASS__, 'register_widget' ] );
+    }
+
+    /**
+     * Custom panel group so the widget appears under "FramePress" in the library.
+     */
+    public static function register_category( \Elementor\Elements_Manager $elements_manager ): void {
+        $elements_manager->add_category(
+            'framepress',
+            [
+                'title' => __( 'FramePress', 'framepress' ),
+                'icon'  => 'fa fa-plug',
+            ]
+        );
     }
 
     public static function register_widget( \Elementor\Widgets_Manager $manager ): void {
@@ -40,7 +54,7 @@ class FramePress_Elementor_Widget extends \Elementor\Widget_Base {
     }
 
     public function get_categories(): array {
-        return [ 'general' ];
+        return [ 'framepress' ];
     }
 
     public function get_keywords(): array {
