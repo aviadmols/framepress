@@ -1,4 +1,24 @@
-<?php defined( 'ABSPATH' ) || exit; ?>
+<?php defined( 'ABSPATH' ) || exit;
+
+// Resolve CodeMirror settings (wp_enqueue_code_editor returns false if user disabled syntax highlighting).
+$cm_php = wp_enqueue_code_editor( [ 'type' => 'application/x-httpd-php' ] );
+$cm_css = wp_enqueue_code_editor( [ 'type' => 'text/css' ] );
+$cm_js  = wp_enqueue_code_editor( [ 'type' => 'text/javascript' ] );
+wp_enqueue_script( 'wp-theme-plugin-editor' );
+wp_enqueue_style( 'wp-codemirror' );
+?>
+<script>
+window.framepressSMData = <?php echo wp_json_encode( [
+    'restUrl'    => rest_url( 'framepress/v1' ),
+    'nonce'      => wp_create_nonce( 'wp_rest' ),
+    'cmSettings' => [
+        'php' => $cm_php,
+        'css' => $cm_css,
+        'js'  => $cm_js,
+    ],
+] ); ?>;
+</script>
+
 <div class="wrap fps-sm-wrap">
     <h1 class="fps-sm-page-title">Sections</h1>
 

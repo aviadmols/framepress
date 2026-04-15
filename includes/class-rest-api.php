@@ -682,11 +682,85 @@ class FramePress_Rest_API {
         }
 
         $label_escaped = addslashes( $label );
+
+        $schema_php = implode( "\n", [
+            '<?php',
+            "defined( 'ABSPATH' ) || exit;",
+            '',
+            'return [',
+            "    'type'     => '{$slug}',",
+            "    'label'    => '{$label_escaped}',",
+            "    'category' => 'content',",
+            "    'contexts' => [ 'page' ],",
+            "    'settings' => [",
+            "        [ 'id' => 'title',   'type' => 'text',     'label' => 'Title',   'default' => '{$label_escaped}' ],",
+            "        [ 'id' => 'content', 'type' => 'textarea', 'label' => 'Content', 'default' => '' ],",
+            '    ],',
+            "    'blocks' => [],",
+            '];',
+            '',
+        ] );
+
+        $section_php = implode( "\n", [
+            '<?php',
+            "defined( 'ABSPATH' ) || exit;",
+            "// Section: {$label_escaped}",
+            '// Available: $settings (array), $blocks (array)',
+            '',
+            "\$title   = esc_html( \$settings['title']   ?? '' );",
+            "\$content = wp_kses_post( \$settings['content'] ?? '' );",
+            '?>',
+            "<div class=\"fp-{$slug}\">",
+            "    <?php if ( \$title ) : ?>",
+            "        <h2 class=\"fp-{$slug}__title\"><?php echo \$title; ?></h2>",
+            "    <?php endif; ?>",
+            "    <?php if ( \$content ) : ?>",
+            "        <div class=\"fp-{$slug}__content\"><?php echo \$content; ?></div>",
+            "    <?php endif; ?>",
+            '</div>',
+            '',
+        ] );
+
+        $style_css = implode( "\n", [
+            "/* {$label} */",
+            '',
+            ".fp-{$slug} {",
+            '    padding: var(--fp-section-padding-v, 60px) var(--fp-section-padding-h, 40px);',
+            '    max-width: var(--fp-container-width, 1200px);',
+            '    margin: 0 auto;',
+            '}',
+            '',
+            ".fp-{$slug}__title {",
+            '    font-family: var(--fp-font-heading, sans-serif);',
+            '    font-weight: var(--fp-heading-weight, 700);',
+            '    color: var(--fp-color-text, #333);',
+            '    margin-bottom: 16px;',
+            '}',
+            '',
+            ".fp-{$slug}__content {",
+            '    font-family: var(--fp-font-body, sans-serif);',
+            '    color: var(--fp-color-text, #333);',
+            '    line-height: var(--fp-line-height, 1.6);',
+            '}',
+            '',
+        ] );
+
+        $script_js = implode( "\n", [
+            "/* {$label} */",
+            '',
+            '(function () {',
+            "    document.querySelectorAll('.fp-{$slug}').forEach(function (el) {",
+            '        // Add interactivity here',
+            '    });',
+            '})();',
+            '',
+        ] );
+
         $files = [
-            'schema.php'  => "<?php\ndefined( 'ABSPATH' ) || exit;\n\nreturn [\n    'type'     => '{$slug}',\n    'label'    => '{$label_escaped}',\n    'category' => 'content',\n    'contexts' => [ 'page' ],\n    'settings' => [],\n    'blocks'   => [],\n];\n",
-            'section.php' => "<?php\ndefined( 'ABSPATH' ) || exit;\n// Render output for the '{$slug}' section.\n// Available: \$settings (array), \$blocks (array)\n",
-            'style.css'   => "/* {$label} — styles */\n",
-            'script.js'   => "/* {$label} — scripts */\n",
+            'schema.php'  => $schema_php,
+            'section.php' => $section_php,
+            'style.css'   => $style_css,
+            'script.js'   => $script_js,
         ];
 
         foreach ( $files as $filename => $content ) {

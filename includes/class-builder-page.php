@@ -79,30 +79,8 @@ class FramePress_Builder_Page {
     }
 
     public function render_sections_manager(): void {
-        $this->enqueue_sections_manager_assets();
+        // Data is injected inline in the template via wp_json_encode — no separate enqueue needed.
         require_once FRAMEPRESS_DIR . 'templates/sections-manager.php';
-    }
-
-    private function enqueue_sections_manager_assets(): void {
-        // CodeMirror — WordPress ships CM5.  wp_enqueue_code_editor() returns settings
-        // array we pass to JS; returns false if user disabled syntax highlighting.
-        $cm_php = wp_enqueue_code_editor( [ 'type' => 'application/x-httpd-php' ] );
-        $cm_css = wp_enqueue_code_editor( [ 'type' => 'text/css' ] );
-        $cm_js  = wp_enqueue_code_editor( [ 'type' => 'text/javascript' ] );
-
-        // Ensure the WP code-editor wrapper (wp.codeEditor) is loaded.
-        wp_enqueue_script( 'wp-theme-plugin-editor' );
-        wp_enqueue_style( 'wp-codemirror' );
-
-        wp_localize_script( 'wp-theme-plugin-editor', 'framepressSMData', [
-            'restUrl'    => rest_url( 'framepress/v1' ),
-            'nonce'      => wp_create_nonce( 'wp_rest' ),
-            'cmSettings' => [
-                'php' => $cm_php,
-                'css' => $cm_css,
-                'js'  => $cm_js,
-            ],
-        ] );
     }
 
     public function render_ai_settings(): void {
