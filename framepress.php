@@ -97,13 +97,16 @@ final class FramePress {
         add_action( 'wp_head',    [ $this->global_settings, 'output_google_fonts' ], 1 );
         add_action( 'admin_head', [ $this->global_settings, 'output_google_fonts' ], 1 );
 
-        // Output hooks — frontend only.
+        // Section assets + global design tokens: hook outside is_admin() so Elementor preview iframe
+        // (runs wp_enqueue_scripts / wp_head as frontend) still loads CSS/JS and :root variables.
+        add_action( 'wp_enqueue_scripts', [ $this->assets, 'enqueue_section_assets' ] );
+        add_action( 'wp_head',            [ $this->global_settings, 'output_css_variables' ] );
+
+        // Output hooks — frontend only (not Elementor editor shell).
         if ( ! is_admin() ) {
-            add_action( 'wp_enqueue_scripts', [ $this->assets, 'enqueue_section_assets' ] );
-            add_action( 'wp_head',            [ $this->global_settings, 'output_css_variables' ] );
-            add_filter( 'the_content',        [ $this->renderer, 'filter_page_content' ] );
-            add_action( 'wp_body_open',       [ $this->renderer, 'output_header_sections' ] );
-            add_action( 'wp_footer',          [ $this->renderer, 'output_footer_sections' ] );
+            add_filter( 'the_content',  [ $this->renderer, 'filter_page_content' ] );
+            add_action( 'wp_body_open', [ $this->renderer, 'output_header_sections' ] );
+            add_action( 'wp_footer',    [ $this->renderer, 'output_footer_sections' ] );
         }
     }
 
