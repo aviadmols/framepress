@@ -100,18 +100,30 @@ class FramePress_Section_Renderer {
             return $content;
         }
 
-        $post_id  = get_the_ID();
-        $raw      = get_post_meta( $post_id, '_framepress_sections', true );
+        $is_preview = (bool) apply_filters( 'framepress_is_preview', false );
+        $post_id    = get_the_ID();
+        $raw        = get_post_meta( $post_id, '_framepress_sections', true );
+
         if ( empty( $raw ) ) {
+            // In preview mode inject an empty container so the JS bridge
+            // has a reliable anchor point for newly added sections.
+            if ( $is_preview ) {
+                return '<div class="framepress-sections-container framepress-sections-container--empty"></div>';
+            }
             return $content;
         }
 
         $instances = json_decode( $raw, true );
         if ( ! is_array( $instances ) ) {
-            return $content;
+            return $is_preview
+                ? '<div class="framepress-sections-container framepress-sections-container--empty"></div>'
+                : $content;
         }
 
-        return $this->render_sections( $instances );
+        $html = $this->render_sections( $instances );
+
+        // Always wrap in named container so the preview bridge can find it.
+        return '<div class="framepress-sections-container">' . $html . '</div>';
     }
 
     /**

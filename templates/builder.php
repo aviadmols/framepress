@@ -25,7 +25,7 @@ defined( 'ABSPATH' ) || exit;
             padding: 0 !important;
             height: 100% !important;
             overflow: hidden !important;
-            background: #1a1a1f !important;
+            background: #f1f2f4 !important;
         }
         #wpadminbar,
         #adminmenumain,

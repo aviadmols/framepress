@@ -92,10 +92,17 @@ class FramePress_Preview {
             /**
              * Swap or insert a section's HTML in the DOM.
              */
+            function getSectionsContainer() {
+                // Primary: our own named wrapper (always present in preview mode).
+                var c = document.querySelector('.framepress-sections-container');
+                if (c) return c;
+                // Fallbacks for themes that do not use the_content filter.
+                return document.querySelector('main .entry-content, .entry-content, main, #main, #content, body');
+            }
+
             function applySection(sectionId, html) {
                 var existing = document.getElementById('framepress-section-' + sectionId);
                 if (existing) {
-                    // Replace innerHTML to preserve wrapper element.
                     var tmp = document.createElement('div');
                     tmp.innerHTML = html;
                     var newNode = tmp.firstElementChild;
@@ -103,9 +110,10 @@ class FramePress_Preview {
                         existing.replaceWith(newNode);
                     }
                 } else {
-                    // New section — append to content container.
-                    var container = document.querySelector('.framepress-sections-container, main, #main, #content');
+                    var container = getSectionsContainer();
                     if (container) {
+                        // Remove the empty-state class once a real section lands.
+                        container.classList.remove('framepress-sections-container--empty');
                         container.insertAdjacentHTML('beforeend', html);
                     }
                 }
