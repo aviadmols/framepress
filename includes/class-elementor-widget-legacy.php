@@ -165,20 +165,18 @@ class FramePress_Elementor_Legacy_Section_Widget extends \Elementor\Widget_Base 
         );
     }
 
+    /**
+     * Panel notice only — must not call get_settings() here: register_controls() runs before
+     * the control stack is complete; Elementor 4+ sanitizing settings early triggers
+     * Undefined array key "id" in Controls_Stack. The canvas overlay still shows Edit in FramePress.
+     */
     private function render_edit_notice(): string {
-        $settings     = $this->get_settings();
-        $section_type = sanitize_key( $settings['section_type'] ?? '' );
-
-        if ( $section_type === '' ) {
-            return '<p style="color:#6d7175;font-size:12px;margin:8px 0 0;">'
-                . esc_html__( 'Choose a section type, then save the page once and use the button below to edit content in FramePress.', 'framepress' )
-                . '</p>';
-        }
-
-        $url = $this->build_edit_url( $section_type );
-        return '<a href="' . esc_url( $url ) . '" target="_blank" '
-            . 'style="display:inline-block;margin-top:8px;padding:7px 16px;background:#2c6ecb;color:#fff;border-radius:5px;font-size:12px;font-weight:600;text-decoration:none;">'
-            . esc_html__( 'Edit in FramePress', 'framepress' ) . '</a>';
+        return '<p style="color:#6d7175;font-size:12px;margin:8px 0 0;">'
+            . esc_html__(
+                'Choose a section type, then save or update the page. Use the “Edit in FramePress” button on the live preview below.',
+                'framepress'
+            )
+            . '</p>';
     }
 
     protected function render(): void {
