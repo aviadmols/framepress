@@ -224,14 +224,12 @@ class FramePress_Section_Renderer {
                 include $__file;
             } catch ( \Throwable $e ) {
                 ob_end_clean();
-                // Show inline error in debug mode; silent empty string in production.
-                if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-                    return '<div style="border:2px solid #d63638;padding:12px 16px;margin:8px 0;font-family:monospace;font-size:13px;color:#d63638;background:#fff0f0">'
-                        . '<strong>FramePress section error</strong> — ' . esc_html( basename( $__file ) ) . '<br>'
-                        . esc_html( $e->getMessage() )
-                        . '</div>';
-                }
-                return '';
+                // Always show inline error — section errors must be visible so they can be fixed.
+                return '<div style="border:2px solid #d63638;padding:12px 16px;margin:8px 0;font-family:monospace;font-size:13px;color:#d63638;background:#fff0f0;direction:ltr;text-align:left">'
+                    . '<strong>FramePress section error</strong> in <em>' . esc_html( basename( $__file ) ) . '</em>:<br><br>'
+                    . esc_html( $e->getMessage() ) . '<br>'
+                    . '<small style="color:#999">Line ' . esc_html( (string) $e->getLine() ) . ' · ' . esc_html( $e->getFile() ) . '</small>'
+                    . '</div>';
             }
             return (string) ob_get_clean();
         };

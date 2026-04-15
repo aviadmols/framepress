@@ -353,7 +353,13 @@ class FramePress_Rest_API {
             return new \WP_REST_Response( [ 'error' => 'unknown section type' ], 400 );
         }
 
-        $html = $this->renderer->render_section( $instance );
+        try {
+            $html = $this->renderer->render_section( $instance );
+        } catch ( \Throwable $e ) {
+            return new \WP_REST_Response( [
+                'error' => 'Section render error in ' . basename( $this->section_registry->get_section_path( $instance['type'] ) ?? '' ) . '/section.php: ' . $e->getMessage(),
+            ], 500 );
+        }
 
         return rest_ensure_response( [
             'html'       => $html,
