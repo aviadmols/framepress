@@ -411,8 +411,8 @@ MSG;
         $section_raw   = $strip_open( $section_php );
         $first_char    = ltrim( $section_raw )[0] ?? '';
         if ( $first_char === '<' ) {
-            // HTML-first template: <?php defined(...); ?> then HTML
-            $section_content = "<?php defined( 'ABSPATH' ) || exit; ?>\n" . $section_raw;
+            // HTML-first template: open PHP, run security check, close PHP tag, then HTML output.
+            $section_content = '<?php defined( \'ABSPATH\' ) || exit; ?>' . "\n" . $section_raw;
         } else {
             // PHP-first file: keep PHP block open
             $section_content = "<?php\ndefined( 'ABSPATH' ) || exit;\n\n" . $section_raw;
