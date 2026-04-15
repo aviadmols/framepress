@@ -119,6 +119,13 @@ class FramePress_Rest_API {
             'permission_callback' => [ $this, 'admin_permission' ],
         ] );
 
+        // Create a new blank section in uploads.
+        register_rest_route( self::NS, '/sections-manager/create', [
+            'methods'             => 'POST',
+            'callback'            => [ $this, 'create_section' ],
+            'permission_callback' => [ $this, 'admin_permission' ],
+        ] );
+
         // Read / write section files (uploads sections only for writes).
         register_rest_route( self::NS, '/sections-manager/(?P<type>[a-z0-9\-]+)/files', [
             [ 'methods' => 'GET',  'callback' => [ $this, 'get_section_files' ],  'permission_callback' => [ $this, 'admin_permission' ] ],
@@ -640,6 +647,60 @@ class FramePress_Rest_API {
         }
 
         return rest_ensure_response( $result );
+    }
+
+    /**
+     * POST /sections-manager/create
+     * Creates blank starter files for a new custom section in the uploads directory.
+     */
+    public function create_section( \WP_REST_Request $request ): \WP_REST_Response {
+        $body  = $request->get_json_params();
+        $slug  = sanitize_title( $body['slug']  ?? '' );
+        $label = sanitize_text_field( $body['label'] ?? '' );
+
+        if ( ! $slug || ! $label ) {
+            return new \WP_REST_Response( [ 'error' => 'slug and label are required.' ], 400 );
+        }
+
+        if ( ! preg_match( '/^[a-z0-9\-]+$/', $slug ) ) {
+            return new \WP_REST_Response( [ 'error' => 'Slug must be lowercase letters, numbers and hyphens only.' ], 400 );
+        }
+
+        if ( $this->section_registry->get_section( $slug ) ) {
+            return new \WP_REST_Response( [ 'error' => "A section with slug '{$slug}' already exists." ], 409 );
+        }
+
+        $upload_dir  = wp_upload_dir();
+        $section_dir = trailingslashit( $upload_dir['basedir'] ) . 'framepress/sections/' . $slug . '/';
+
+        if ( file_exists( $section_dir ) ) {
+            return new \WP_REST_Response( [ 'error' => "Directory already exists for slug '{$slug}'." ], 409 );
+        }
+
+        if ( ! wp_mkdir_p( $section_dir ) ) {
+            return new \WP_REST_Response( [ 'error' => 'Could not create section directory — check uploads permissions.' ], 500 );
+        }
+
+        $label_escaped = addslashes( $label );
+        $files = [
+            'schema.php'  => "<?php\ndefined( 'ABSPATH' ) || exit;\n\nreturn [\n    'type'     => '{$slug}',\n    'label'    => '{$label_escaped}',\n    'category' => 'content',\n    'contexts' => [ 'page' ],\n    'settings' => [],\n    'blocks'   => [],\n];\n",
+            'section.php' => "<?php\ndefined( 'ABSPATH' ) || exit;\n// Render output for the '{$slug}' section.\n// Available: \$settings (array), \$blocks (array)\n",
+            'style.css'   => "/* {$label} — styles */\n",
+            'script.js'   => "/* {$label} — scripts */\n",
+        ];
+
+        foreach ( $files as $filename => $content ) {
+            if ( file_put_contents( $section_dir . $filename, $content ) === false ) {
+                // Partial write — clean up.
+                foreach ( array_keys( $files ) as $f ) { @unlink( $section_dir . $f ); }
+                @rmdir( $section_dir );
+                return new \WP_REST_Response( [ 'error' => "Could not write {$filename}." ], 500 );
+            }
+        }
+
+        delete_transient( 'framepress_section_registry' );
+
+        return rest_ensure_response( [ 'success' => true, 'type' => $slug ] );
     }
 
     /**
