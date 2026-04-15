@@ -220,7 +220,19 @@ class FramePress_Section_Renderer {
     private function load_template( string $file, array $settings, array $blocks, array $section ): string {
         $render = static function ( string $__file, array $settings, array $blocks, array $section ): string {
             ob_start();
-            include $__file;
+            try {
+                include $__file;
+            } catch ( \Throwable $e ) {
+                ob_end_clean();
+                // Show inline error in debug mode; silent empty string in production.
+                if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+                    return '<div style="border:2px solid #d63638;padding:12px 16px;margin:8px 0;font-family:monospace;font-size:13px;color:#d63638;background:#fff0f0">'
+                        . '<strong>FramePress section error</strong> — ' . esc_html( basename( $__file ) ) . '<br>'
+                        . esc_html( $e->getMessage() )
+                        . '</div>';
+                }
+                return '';
+            }
             return (string) ob_get_clean();
         };
         return $render( $file, $settings, $blocks, $section );
