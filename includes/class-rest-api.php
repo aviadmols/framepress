@@ -116,20 +116,20 @@ class FramePress_Rest_API {
         register_rest_route( self::NS, '/sections-manager/list', [
             'methods'             => 'GET',
             'callback'            => [ $this, 'sections_manager_list' ],
-            'permission_callback' => [ $this, 'admin_permission' ],
+            'permission_callback' => [ $this, 'editor_permission' ],
         ] );
 
         // Create a new blank section in uploads.
         register_rest_route( self::NS, '/sections-manager/create', [
             'methods'             => 'POST',
             'callback'            => [ $this, 'create_section' ],
-            'permission_callback' => [ $this, 'admin_permission' ],
+            'permission_callback' => [ $this, 'editor_permission' ],
         ] );
 
         // Read / write section files (uploads sections only for writes).
         register_rest_route( self::NS, '/sections-manager/(?P<type>[a-z0-9\-]+)/files', [
-            [ 'methods' => 'GET',  'callback' => [ $this, 'get_section_files' ],  'permission_callback' => [ $this, 'admin_permission' ] ],
-            [ 'methods' => 'POST', 'callback' => [ $this, 'save_section_files' ], 'permission_callback' => [ $this, 'admin_permission' ] ],
+            [ 'methods' => 'GET',  'callback' => [ $this, 'get_section_files' ],  'permission_callback' => [ $this, 'editor_permission' ] ],
+            [ 'methods' => 'POST', 'callback' => [ $this, 'save_section_files' ], 'permission_callback' => [ $this, 'editor_permission' ] ],
         ] );
 
         // ── AI endpoints ──────────────────────────────────────────────────────
