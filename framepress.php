@@ -11,6 +11,13 @@
 
 defined( 'ABSPATH' ) || exit;
 
+// Prevent PHP notices/warnings from being printed into admin-ajax JSON (Elementor, REST, etc.).
+// Must run on every load — not only when Elementor integration bootstrap runs.
+if ( defined( 'DOING_AJAX' ) && DOING_AJAX ) {
+    // phpcs:ignore WordPress.PHP.IniSet.display_errors_Disallowed -- AJAX JSON must stay clean; log still works.
+    @ini_set( 'display_errors', '0' );
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 define( 'FRAMEPRESS_VERSION',  '1.0.0' );
@@ -180,11 +187,6 @@ function framepress_bootstrap_elementor(): void {
     }
     if ( empty( $gs['elementor_widgets_enabled'] ) ) {
         return;
-    }
-    // Prevent PHP warnings/notices from corrupting JSON in Elementor AJAX responses (admin-ajax.php).
-    if ( defined( 'DOING_AJAX' ) && DOING_AJAX ) {
-        // phpcs:ignore WordPress.PHP.IniSet.display_errors_Disallowed -- scoped to AJAX; errors still go to log.
-        @ini_set( 'display_errors', '0' );
     }
     require_once FRAMEPRESS_DIR . 'includes/class-elementor-integration.php';
     FramePress_Elementor_Integration::init();
