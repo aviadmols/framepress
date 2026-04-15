@@ -83,7 +83,8 @@ class FramePress_Elementor_Integration {
         }
 
         if ( null === $manager->get_widget_types( 'framepress-section' ) ) {
-            $manager->register( new FramePress_Elementor_Legacy_Section_Widget() );
+            // Non-null $args keeps Elementor happy if prototype detection ever changes.
+            $manager->register( new FramePress_Elementor_Legacy_Section_Widget( [], [ 'fp_legacy_prototype' => true ] ) );
         }
     }
 }

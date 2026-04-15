@@ -19,7 +19,9 @@ class FramePress_Elementor_Section_Widget extends \Elementor\Widget_Base {
      * @param array<string, mixed>|null $args Registration args (e.g. fp_section_type for prototype).
      */
     public function __construct( array $data = [], ?array $args = null ) {
-        if ( ! isset( $data['settings'] ) || ! is_array( $data['settings'] ) ) {
+        // Only coerce settings when the key exists (saved JSON). Empty $data for
+        // registration prototype must stay empty so Elementor keeps type-instance mode.
+        if ( array_key_exists( 'settings', $data ) && ! is_array( $data['settings'] ) ) {
             $data['settings'] = [];
         }
         if ( ! empty( $data['widgetType'] ) ) {

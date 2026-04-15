@@ -15,7 +15,10 @@ class FramePress_Elementor_Legacy_Section_Widget extends \Elementor\Widget_Base 
      * @param array<string, mixed>|null $args Registration args.
      */
     public function __construct( array $data = [], ?array $args = null ) {
-        if ( ! isset( $data['settings'] ) || ! is_array( $data['settings'] ) ) {
+        // Only normalize when `settings` is present (saved element). Do not inject
+        // settings into an empty $data[] — that makes $data truthy and Elementor treats
+        // the instance as "full" and requires non-null $args (Widget_Base constructor).
+        if ( array_key_exists( 'settings', $data ) && ! is_array( $data['settings'] ) ) {
             $data['settings'] = [];
         }
         parent::__construct( $data, $args );
