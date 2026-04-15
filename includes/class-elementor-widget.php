@@ -11,6 +11,23 @@ class FramePress_Elementor_Section_Widget extends \Elementor\Widget_Base {
     /** @var array<string, array> */
     private static array $schemas = [];
 
+    /** Cached widget name from constructor $data (avoid get_data() in get_name() — triggers sanitize_settings on null). */
+    private ?string $fp_widget_name = null;
+
+    /**
+     * @param array<string, mixed> $data Element data.
+     * @param array<string, mixed>|null $args Registration args (e.g. fp_section_type for prototype).
+     */
+    public function __construct( array $data = [], ?array $args = null ) {
+        if ( ! isset( $data['settings'] ) || ! is_array( $data['settings'] ) ) {
+            $data['settings'] = [];
+        }
+        if ( ! empty( $data['widgetType'] ) ) {
+            $this->fp_widget_name = (string) $data['widgetType'];
+        }
+        parent::__construct( $data, $args );
+    }
+
     /**
      * @param array<string, array> $sections Section schemas from FramePress_Section_Registry::get_all_sections().
      */
@@ -25,9 +42,8 @@ class FramePress_Elementor_Section_Widget extends \Elementor\Widget_Base {
     }
 
     public function get_name(): string {
-        $data = $this->get_data();
-        if ( ! empty( $data['widgetType'] ) ) {
-            return (string) $data['widgetType'];
+        if ( $this->fp_widget_name !== null && $this->fp_widget_name !== '' ) {
+            return $this->fp_widget_name;
         }
         $type = $this->get_default_args( 'fp_section_type' );
         if ( $type ) {
