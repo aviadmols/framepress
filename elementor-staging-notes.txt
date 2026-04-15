@@ -1,0 +1,20 @@
+FramePress + Elementor — staging, SSL, admin-ajax
+================================================
+
+These issues are fixed on the server / WordPress config, not inside FramePress PHP.
+
+1) Browser: ERR_CERT_COMMON_NAME_INVALID (uploads SVG/PNG, fetchInlineSvg failed)
+   - The SSL certificate must be valid for the exact host in the address bar (e.g. uPress staging subdomain).
+   - WordPress: Settings > General — "WordPress Address" and "Site Address" must use that same host and https.
+   - If URLs are correct but the cert still mismatches, contact the host to re-issue or attach SSL to this hostname.
+
+2) POST /wp-admin/admin-ajax.php 500
+   - In wp-config.php set: define( 'WP_DEBUG', true ); define( 'WP_DEBUG_LOG', true );
+   - Reproduce the error, then open wp-content/debug.log and find the "PHP Fatal error" line and file path.
+   - Fix or update the plugin/theme shown there (may or may not be FramePress).
+
+3) script_ry.js — Cannot read properties of null (getContext)
+   - Use DevTools > Network to see which plugin loads script_ry.js, or search the wp-content/plugins folder for "script_ry".
+   - Disable that plugin temporarily to confirm.
+
+Permissions policy / unload messages in the console are usually harmless noise.

@@ -162,6 +162,8 @@ add_action( 'plugins_loaded', [ FramePress::class, 'get_instance' ] );
  * Elementor: register widget + category when Elementor is available.
  * If Elementor loads before FramePress, `elementor/loaded` has already fired — hooking only
  * that action would miss registration; we catch that via `did_action` on `plugins_loaded`.
+ *
+ * Staging/editor issues (SSL on uploads, admin-ajax 500) are documented in elementor-staging-notes.txt.
  */
 function framepress_bootstrap_elementor(): void {
     static $done = false;
