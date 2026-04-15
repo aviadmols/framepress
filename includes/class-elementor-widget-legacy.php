@@ -153,30 +153,15 @@ class FramePress_Elementor_Legacy_Section_Widget extends \Elementor\Widget_Base 
         return $data;
     }
 
-    private function build_edit_url( string $section_type ): string {
-        return admin_url(
-            add_query_arg(
-                [
-                    'page'              => 'framepress',
-                    'context'           => 'elementor-section',
-                    'section_key'       => $this->get_storage_hash(),
-                    'section_type'      => $section_type,
-                    'elementor_post_id' => $this->get_main_post_id(),
-                ],
-                'admin.php'
-            )
-        );
-    }
-
     /**
      * Panel notice only — must not call get_settings() here: register_controls() runs before
      * the control stack is complete; Elementor 4+ sanitizing settings early triggers
-     * Undefined array key "id" in Controls_Stack. The canvas overlay still shows Edit in FramePress.
+     * Undefined array key "id" in Controls_Stack.
      */
     private function render_edit_notice(): string {
         return '<p style="color:#6d7175;font-size:12px;margin:8px 0 0;">'
             . esc_html__(
-                'Choose a section type, then save or update the page. Use the “Edit in FramePress” button on the live preview below.',
+                'Choose a section type, then save or update the page. Edit stored content in FramePress from the WordPress admin.',
                 'framepress'
             )
             . '</p>';
@@ -214,17 +199,7 @@ class FramePress_Elementor_Legacy_Section_Widget extends \Elementor\Widget_Base 
         $instance = $this->load_instance( $section_type );
         $html     = $fp->renderer->render_section( $instance );
 
-        if ( \Elementor\Plugin::$instance->editor->is_edit_mode() ) {
-            // phpcs:ignore WordPress.Security.EscapeOutput
-            echo '<div style="position:relative;">' . $html;
-            $edit_url = $this->build_edit_url( $section_type );
-            echo '<div style="position:absolute;top:8px;right:8px;z-index:999;">'
-                . '<a href="' . esc_url( $edit_url ) . '" target="_blank" '
-                . 'style="display:inline-block;padding:6px 14px;background:#2c6ecb;color:#fff;border-radius:5px;font-size:12px;font-weight:600;text-decoration:none;font-family:sans-serif;">'
-                . esc_html__( 'Edit in FramePress', 'framepress' ) . '</a></div></div>';
-        } else {
-            // phpcs:ignore WordPress.Security.EscapeOutput
-            echo $html;
-        }
+        // phpcs:ignore WordPress.Security.EscapeOutput
+        echo $html;
     }
 }

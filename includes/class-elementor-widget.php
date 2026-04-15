@@ -344,18 +344,8 @@ class FramePress_Elementor_Section_Widget extends \Elementor\Widget_Base {
         $instance = $this->build_render_instance();
         $html     = $fp->renderer->render_section( $instance );
 
-        if ( \Elementor\Plugin::$instance->editor->is_edit_mode() ) {
-            // phpcs:ignore WordPress.Security.EscapeOutput
-            echo '<div style="position:relative;">' . $html;
-            $edit_url = $this->build_edit_url( $type );
-            echo '<div style="position:absolute;top:8px;right:8px;z-index:999;">'
-                . '<a href="' . esc_url( $edit_url ) . '" target="_blank" '
-                . 'style="display:inline-block;padding:6px 14px;background:#2c6ecb;color:#fff;border-radius:5px;font-size:12px;font-weight:600;text-decoration:none;font-family:sans-serif;">'
-                . esc_html__( 'Edit in FramePress', 'framepress' ) . '</a></div></div>';
-        } else {
-            // phpcs:ignore WordPress.Security.EscapeOutput
-            echo $html;
-        }
+        // phpcs:ignore WordPress.Security.EscapeOutput
+        echo $html;
     }
 
     /**
