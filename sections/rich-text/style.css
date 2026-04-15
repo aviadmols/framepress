@@ -1,0 +1,31 @@
+/* FramePress — Rich Text Section */
+
+.fp-rich-text {
+    padding: var(--fp-section-padding-v, 80px) var(--fp-section-padding-h, 40px);
+}
+
+.fp-rich-text .fp-container {
+    max-width: var(--fp-container-width, 1200px);
+    margin: 0 auto;
+}
+
+.fp-rich-text__inner {
+    margin: 0 auto;
+    color: var(--fp-color-text, #333);
+    font-family: var(--fp-font-body, sans-serif);
+    line-height: var(--fp-line-height, 1.6);
+}
+
+.fp-rich-text__inner h1,
+.fp-rich-text__inner h2,
+.fp-rich-text__inner h3,
+.fp-rich-text__inner h4 {
+    font-family: var(--fp-font-heading, sans-serif);
+    font-weight: var(--fp-heading-weight, 700);
+    margin: 0 0 1rem;
+}
+
+.fp-rich-text__inner p { margin: 0 0 1.25rem; }
+.fp-rich-text__inner a { color: var(--fp-color-primary, #0073aa); }
+.fp-rich-text__inner ul,
+.fp-rich-text__inner ol { padding-left: 1.5em; margin: 0 0 1.25rem; }

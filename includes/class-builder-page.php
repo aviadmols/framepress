@@ -1,0 +1,198 @@
+<?php
+/**
+ * FramePress Builder Page
+ *
+ * Registers the admin pages and enqueues the React builder application.
+ * The builder runs as a bare full-viewport page (no WP admin chrome)
+ * so the iframe preview can fill the available space cleanly.
+ */
+
+defined( 'ABSPATH' ) || exit;
+
+class FramePress_Builder_Page {
+
+    public function __construct() {
+        add_action( 'admin_menu',              [ $this, 'add_admin_menu' ] );
+        add_filter( 'page_row_actions',        [ $this, 'add_page_edit_link' ], 10, 2 );
+        add_action( 'admin_bar_menu',          [ $this, 'add_admin_bar_link' ], 100 );
+    }
+
+    // ─── Admin menu ───────────────────────────────────────────────────────────
+
+    public function add_admin_menu(): void {
+        // Top-level menu.
+        add_menu_page(
+            __( 'FramePress', 'framepress' ),
+            __( 'FramePress', 'framepress' ),
+            'edit_pages',
+            'framepress',
+            [ $this, 'render_hub_page' ],
+            'dashicons-layout',
+            59
+        );
+
+        // Remove duplicate auto-created submenu.
+        add_submenu_page( 'framepress', __( 'Pages', 'framepress' ),          __( 'Pages', 'framepress' ),          'edit_pages',    'framepress',              [ $this, 'render_hub_page' ] );
+        add_submenu_page( 'framepress', __( 'Header Builder', 'framepress' ),  __( 'Header', 'framepress' ),         'edit_pages',    'framepress-header',       [ $this, 'render_header_builder' ] );
+        add_submenu_page( 'framepress', __( 'Footer Builder', 'framepress' ),  __( 'Footer', 'framepress' ),         'edit_pages',    'framepress-footer',       [ $this, 'render_footer_builder' ] );
+        add_submenu_page( 'framepress', __( 'Global Settings', 'framepress' ), __( 'Global Settings', 'framepress' ),'edit_pages',    'framepress-global',       [ $this, 'render_global_settings' ] );
+        add_submenu_page( 'framepress', __( 'Sections', 'framepress' ),        __( 'Sections', 'framepress' ),       'manage_options','framepress-sections-mgr', [ $this, 'render_sections_manager' ] );
+        add_submenu_page( 'framepress', __( 'AI Settings', 'framepress' ),     __( 'AI Settings', 'framepress' ),    'manage_options','framepress-ai-settings',  [ $this, 'render_ai_settings' ] );
+    }
+
+    // ─── Page callbacks ───────────────────────────────────────────────────────
+
+    /** Hub: list of pages with "Edit with FramePress" links — or the builder if post_id is set. */
+    public function render_hub_page(): void {
+        // If a post_id is present, render the full builder for that page.
+        if ( isset( $_GET['post_id'] ) && absint( $_GET['post_id'] ) > 0 ) {
+            $context = isset( $_GET['context'] ) ? sanitize_key( $_GET['context'] ) : 'page';
+            $this->render_builder( absint( $_GET['post_id'] ), $context );
+            return;
+        }
+
+        $pages = get_pages( [ 'sort_column' => 'post_title', 'sort_order' => 'ASC' ] );
+        echo '<div class="wrap"><h1>' . esc_html__( 'FramePress Pages', 'framepress' ) . '</h1><table class="wp-list-table widefat fixed">';
+        echo '<thead><tr><th>' . esc_html__( 'Page', 'framepress' ) . '</th><th>' . esc_html__( 'Actions', 'framepress' ) . '</th></tr></thead><tbody>';
+        foreach ( $pages as $page ) {
+            $edit_url = $this->builder_url( $page->ID, 'page' );
+            echo '<tr>';
+            echo '<td>' . esc_html( $page->post_title ) . '</td>';
+            echo '<td><a href="' . esc_url( $edit_url ) . '" class="button button-primary">' . esc_html__( 'Edit with FramePress', 'framepress' ) . '</a>';
+            echo ' <a href="' . esc_url( get_edit_post_link( $page->ID ) ) . '">' . esc_html__( 'WordPress Editor', 'framepress' ) . '</a></td>';
+            echo '</tr>';
+        }
+        echo '</tbody></table></div>';
+    }
+
+    /** Full-viewport builder for a specific page. */
+    public function render_header_builder(): void {
+        $this->render_builder( 0, 'header' );
+    }
+
+    public function render_footer_builder(): void {
+        $this->render_builder( 0, 'footer' );
+    }
+
+    public function render_global_settings(): void {
+        $this->render_builder( 0, 'global' );
+    }
+
+    public function render_sections_manager(): void {
+        $this->render_builder( 0, 'sections-manager' );
+    }
+
+    public function render_ai_settings(): void {
+        $this->render_builder( 0, 'ai-settings' );
+    }
+
+    // ─── Core builder renderer ────────────────────────────────────────────────
+
+    private function render_builder( int $post_id = 0, string $context = 'page' ): void {
+        // Allow post_id override via GET param (for page builder links).
+        if ( isset( $_GET['post_id'] ) ) {
+            $post_id = absint( $_GET['post_id'] );
+        }
+
+        $this->enqueue_builder_assets( $post_id, $context );
+
+        // Output bare page — no WP admin header/footer.
+        require_once FRAMEPRESS_DIR . 'templates/builder.php';
+    }
+
+    // ─── Asset enqueueing ─────────────────────────────────────────────────────
+
+    private function enqueue_builder_assets( int $post_id, string $context ): void {
+        // Required for WP media picker.
+        wp_enqueue_media();
+
+        $dist = FRAMEPRESS_DIR . 'assets/builder/dist/';
+
+        // Vite outputs a manifest.json — read it to get hashed filenames.
+        $manifest_path = $dist . '.vite/manifest.json';
+        $js_file  = 'assets/builder/dist/main.js';
+        $css_file = 'assets/builder/dist/main.css';
+
+        if ( ! file_exists( $manifest_path ) ) {
+            add_action( 'admin_notices', function () use ( $manifest_path ) {
+                echo '<div class="notice notice-error"><p><strong>FramePress:</strong> Builder assets not found. '
+                    . 'Upload the <code>assets/builder/dist/</code> folder to the server. '
+                    . 'Expected manifest at: <code>' . esc_html( $manifest_path ) . '</code></p></div>';
+            } );
+        }
+
+        if ( file_exists( $manifest_path ) ) {
+            $manifest = json_decode( file_get_contents( $manifest_path ), true );
+            if ( isset( $manifest['src/index.jsx']['file'] ) ) {
+                $js_file = 'assets/builder/dist/' . $manifest['src/index.jsx']['file'];
+            }
+            if ( isset( $manifest['src/index.jsx']['css'][0] ) ) {
+                $css_file = 'assets/builder/dist/' . $manifest['src/index.jsx']['css'][0];
+            }
+        }
+
+        if ( file_exists( FRAMEPRESS_DIR . $css_file ) ) {
+            wp_enqueue_style( 'framepress-builder', FRAMEPRESS_URL . $css_file, [], FRAMEPRESS_VERSION );
+        }
+
+        if ( file_exists( FRAMEPRESS_DIR . $js_file ) ) {
+            wp_enqueue_script( 'framepress-builder', FRAMEPRESS_URL . $js_file, [], FRAMEPRESS_VERSION, true );
+        }
+
+        // Pass data to React.
+        $preview_nonce = $post_id ? wp_create_nonce( 'framepress_preview_' . $post_id ) : '';
+        $preview_url   = $post_id
+            ? add_query_arg( [
+                'framepress_preview' => 1,
+                'post_id'            => $post_id,
+                'context'            => $context,
+                'nonce'              => $preview_nonce,
+            ], get_permalink( $post_id ) ?: home_url( '/' ) )
+            : add_query_arg( [
+                'framepress_preview' => 1,
+                'post_id'            => 0,
+                'context'            => $context,
+                'nonce'              => wp_create_nonce( 'framepress_preview_0' ),
+            ], home_url( '/' ) );
+
+        wp_localize_script( 'framepress-builder', 'framepressData', [
+            'restUrl'        => rest_url( 'framepress/v1' ),
+            'nonce'          => wp_create_nonce( 'wp_rest' ),
+            'postId'         => $post_id,
+            'context'        => $context,
+            'previewUrl'     => $preview_url,
+            'adminUrl'       => admin_url(),
+            'version'        => FRAMEPRESS_VERSION,
+            'aiEnabled'      => (bool) get_option( 'framepress_ai_enabled', false ),
+        ] );
+    }
+
+    // ─── Utility ──────────────────────────────────────────────────────────────
+
+    public function builder_url( int $post_id, string $context = 'page' ): string {
+        return admin_url( 'admin.php?page=framepress&post_id=' . $post_id . '&context=' . $context );
+    }
+
+    /** Add "Edit with FramePress" to page row actions. */
+    public function add_page_edit_link( array $actions, \WP_Post $post ): array {
+        if ( $post->post_type === 'page' && current_user_can( 'edit_page', $post->ID ) ) {
+            $actions['framepress'] = '<a href="' . esc_url( $this->builder_url( $post->ID ) ) . '">'
+                . esc_html__( 'Edit with FramePress', 'framepress' )
+                . '</a>';
+        }
+        return $actions;
+    }
+
+    /** Add "FramePress" link to admin bar when viewing a page on the frontend. */
+    public function add_admin_bar_link( \WP_Admin_Bar $bar ): void {
+        if ( ! is_singular() || ! current_user_can( 'edit_pages' ) ) {
+            return;
+        }
+        $bar->add_node( [
+            'id'    => 'framepress-edit',
+            'title' => '🖼 FramePress',
+            'href'  => $this->builder_url( get_the_ID() ),
+            'meta'  => [ 'title' => __( 'Edit with FramePress', 'framepress' ) ],
+        ] );
+    }
+}

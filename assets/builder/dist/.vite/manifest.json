@@ -1,0 +1,11 @@
+{
+  "src/index.jsx": {
+    "file": "assets/index-DBWaYOqt.js",
+    "name": "index",
+    "src": "src/index.jsx",
+    "isEntry": true,
+    "css": [
+      "assets/index-BwLaSaig.css"
+    ]
+  }
+}

@@ -1,0 +1,41 @@
+/* FramePress — Image Banner Section */
+
+.fp-image-banner {
+    position: relative;
+    display: flex;
+    align-items: center;
+    background-color: #ccc;
+}
+
+.fp-image-banner__overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+.fp-image-banner .fp-container {
+    position: relative;
+    z-index: 1;
+    max-width: var(--fp-container-width, 1200px);
+    margin: 0 auto;
+    padding: 3rem var(--fp-section-padding-h, 40px);
+    width: 100%;
+}
+
+.fp-image-banner__content { max-width: 600px; }
+.fp-image-banner--center .fp-container { display: flex; justify-content: center; }
+.fp-image-banner--center .fp-image-banner__content { text-align: center; }
+.fp-image-banner--right  .fp-container { display: flex; justify-content: flex-end; }
+
+.fp-image-banner__title {
+    margin: 0 0 0.75rem;
+    font-size: clamp(1.5rem, 3vw, 2.5rem);
+    font-weight: var(--fp-heading-weight, 700);
+    color: inherit;
+}
+
+.fp-image-banner__subtitle {
+    margin: 0 0 1.5rem;
+    color: inherit;
+    opacity: 0.9;
+}

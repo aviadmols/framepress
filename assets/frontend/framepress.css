@@ -1,0 +1,166 @@
+/**
+ * FramePress Frontend Base Styles
+ *
+ * Provides only the minimal shared utilities used across all sections.
+ * Section-specific styles live in each section's own style.css file.
+ * Global design tokens are output as CSS custom properties on :root by
+ * FramePress_Global_Settings::output_css_variables().
+ */
+
+/* ── Container ───────────────────────────────────────────────────────────── */
+
+.fp-container {
+    max-width: var(--fp-container-width, 1200px);
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: var(--fp-section-padding-h, 40px);
+    padding-right: var(--fp-section-padding-h, 40px);
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* ── Section wrapper ─────────────────────────────────────────────────────── */
+
+.framepress-section {
+    position: relative;
+    box-sizing: border-box;
+}
+
+/* ── Header / Footer wrappers ────────────────────────────────────────────── */
+
+.framepress-header,
+.framepress-footer {
+    position: relative;
+}
+
+/* ── Button base ─────────────────────────────────────────────────────────── */
+
+.fp-btn {
+    display: inline-block;
+    padding: var(--fp-btn-padding-v, 12px) var(--fp-btn-padding-h, 24px);
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: var(--fp-btn-font-weight, 600);
+    text-transform: var(--fp-btn-text-transform, none);
+    text-decoration: none;
+    border-radius: var(--fp-btn-radius, 4px);
+    cursor: pointer;
+    transition: opacity 0.15s, background-color 0.15s, color 0.15s, border-color 0.15s;
+    border: 2px solid transparent;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.fp-btn--primary {
+    background-color: var(--fp-color-primary, #0073aa);
+    color: #fff;
+    border-color: var(--fp-color-primary, #0073aa);
+}
+
+.fp-btn--primary:hover {
+    opacity: 0.88;
+    text-decoration: none;
+    color: #fff;
+}
+
+.fp-btn--outline {
+    background-color: transparent;
+    color: var(--fp-color-primary, #0073aa);
+    border-color: var(--fp-color-primary, #0073aa);
+}
+
+.fp-btn--outline:hover {
+    background-color: var(--fp-color-primary, #0073aa);
+    color: #fff;
+    text-decoration: none;
+}
+
+.fp-btn--ghost {
+    background-color: transparent;
+    color: inherit;
+    border-color: currentColor;
+}
+
+.fp-btn--ghost:hover {
+    background-color: rgba(255,255,255,0.15);
+    text-decoration: none;
+}
+
+/* ── Footer column base ──────────────────────────────────────────────────── */
+
+.fp-footer-columns__grid {
+    display: grid;
+    gap: var(--fp-gap, 24px);
+    padding: var(--fp-section-padding-v, 80px) 0;
+}
+
+.fp-footer-columns--cols-2 .fp-footer-columns__grid { grid-template-columns: repeat(2, 1fr); }
+.fp-footer-columns--cols-3 .fp-footer-columns__grid { grid-template-columns: repeat(3, 1fr); }
+.fp-footer-columns--cols-4 .fp-footer-columns__grid { grid-template-columns: repeat(4, 1fr); }
+
+.fp-footer-columns .fp-container {
+    max-width: var(--fp-container-width, 1200px);
+    margin: 0 auto;
+    padding-left: var(--fp-section-padding-h, 40px);
+    padding-right: var(--fp-section-padding-h, 40px);
+}
+
+.fp-footer-columns__heading {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    opacity: 0.6;
+    margin: 0 0 1rem;
+}
+
+.fp-footer-columns__content { line-height: 1.7; font-size: 0.9rem; }
+.fp-footer-columns__content a { color: inherit; opacity: 0.8; text-decoration: none; }
+.fp-footer-columns__content a:hover { opacity: 1; }
+
+.fp-footer-copyright { padding: 1rem 0; }
+.fp-footer-copyright .fp-container { max-width: var(--fp-container-width, 1200px); margin: 0 auto; padding: 0 var(--fp-section-padding-h, 40px); }
+.fp-footer-copyright__text { margin: 0; font-size: 0.875rem; }
+
+/* ── Header logo + nav base ──────────────────────────────────────────────── */
+
+.fp-header-logo__link { display: inline-flex; align-items: center; text-decoration: none; }
+.fp-header-logo__text { font-size: 1.25rem; font-weight: 700; color: inherit; }
+
+.fp-header-nav__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    align-items: center;
+}
+
+.fp-header-nav__list li { position: relative; }
+.fp-header-nav__list a { padding: 0.5rem 0.75rem; display: block; text-decoration: none; color: inherit; font-size: 0.95rem; }
+.fp-header-nav__list a:hover { color: var(--fp-color-primary, #0073aa); }
+
+.fp-header-nav--center { display: flex; justify-content: center; }
+.fp-header-nav--right  { display: flex; justify-content: flex-end; }
+
+/* ── Testimonial base ────────────────────────────────────────────────────── */
+
+.fp-testimonial { margin: 0; padding: 1.5rem; border-left: 3px solid var(--fp-color-primary, #0073aa); }
+.fp-testimonial__avatar { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; margin-bottom: 0.75rem; }
+.fp-testimonial__quote { font-style: italic; line-height: 1.6; margin: 0 0 1rem; }
+.fp-testimonial__footer { display: flex; flex-direction: column; gap: 0.2rem; }
+.fp-testimonial__author { font-weight: 600; font-style: normal; }
+.fp-testimonial__role { font-size: 0.85rem; opacity: 0.7; }
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+    .fp-container { padding-left: 1.25rem; padding-right: 1.25rem; }
+    .fp-footer-columns--cols-3 .fp-footer-columns__grid,
+    .fp-footer-columns--cols-4 .fp-footer-columns__grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 480px) {
+    .fp-footer-columns__grid { grid-template-columns: 1fr !important; }
+    .fp-header-nav__list { gap: 0; }
+}
