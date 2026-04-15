@@ -208,7 +208,13 @@ class FramePress_Section_Renderer {
             }
         }
 
-        return array_unique( array_filter( $types ) );
+        /**
+         * Allow integrations (e.g. Elementor) to add section types used on this request
+         * so assets enqueue during `wp_enqueue_scripts` — before `wp_head` prints styles.
+         *
+         * @param string[] $types Section type slugs.
+         */
+        return array_unique( array_filter( apply_filters( 'framepress_active_section_types', $types ) ) );
     }
 
     // ─── Internal helpers ─────────────────────────────────────────────────────

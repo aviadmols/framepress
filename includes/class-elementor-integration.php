@@ -28,6 +28,92 @@ class FramePress_Elementor_Integration {
 
         add_action( 'elementor/elements/categories_registered', [ __CLASS__, 'register_category' ] );
         add_action( 'elementor/widgets/register', [ __CLASS__, 'register_widget' ] );
+        add_filter( 'framepress_active_section_types', [ __CLASS__, 'filter_active_section_types' ] );
+    }
+
+    /**
+     * Merge FramePress section types referenced by Elementor document data so
+     * `wp_enqueue_scripts` can load `sections/{type}/style.css` before `wp_head`.
+     * (Widget `render()` runs in the body — too late for `wp_enqueue_style` in the head.)
+     *
+     * @param string[] $types Existing types from post meta / header / footer.
+     * @return string[]
+     */
+    public static function filter_active_section_types( array $types ): array {
+        $post_id = (int) get_the_ID();
+        if ( ! $post_id && class_exists( '\Elementor\Plugin' ) ) {
+            $doc = \Elementor\Plugin::$instance->documents->get_current();
+            if ( $doc ) {
+                $post_id = (int) $doc->get_main_id();
+            }
+        }
+        if ( $post_id <= 0 ) {
+            return $types;
+        }
+
+        $from_el = self::collect_section_types_from_elementor_data( $post_id );
+        if ( empty( $from_el ) ) {
+            return $types;
+        }
+
+        return array_merge( $types, $from_el );
+    }
+
+    /**
+     * Parse `_elementor_data` for fp-* widgets and legacy `framepress-section`.
+     *
+     * @return string[]
+     */
+    private static function collect_section_types_from_elementor_data( int $post_id ): array {
+        $raw = get_post_meta( $post_id, '_elementor_data', true );
+        if ( $raw === '' || $raw === null ) {
+            return [];
+        }
+        if ( is_string( $raw ) ) {
+            $data = json_decode( $raw, true );
+        } else {
+            $data = $raw;
+        }
+        if ( ! is_array( $data ) ) {
+            return [];
+        }
+
+        return array_unique( array_filter( self::walk_elementor_elements_for_fp_types( $data ) ) );
+    }
+
+    /**
+     * @param array<int, mixed> $elements
+     * @return string[]
+     */
+    private static function walk_elementor_elements_for_fp_types( array $elements ): array {
+        $out = [];
+        foreach ( $elements as $el ) {
+            if ( ! is_array( $el ) ) {
+                continue;
+            }
+            $el_type     = isset( $el['elType'] ) ? (string) $el['elType'] : '';
+            $widget_type = isset( $el['widgetType'] ) ? (string) $el['widgetType'] : '';
+
+            if ( $el_type === 'widget' && $widget_type !== '' ) {
+                if ( str_starts_with( $widget_type, 'fp-' ) ) {
+                    $slug = substr( $widget_type, 3 );
+                    if ( $slug !== '' ) {
+                        $out[] = sanitize_key( $slug );
+                    }
+                } elseif ( $widget_type === 'framepress-section' ) {
+                    $settings = isset( $el['settings'] ) && is_array( $el['settings'] ) ? $el['settings'] : [];
+                    $st       = isset( $settings['section_type'] ) ? sanitize_key( (string) $settings['section_type'] ) : '';
+                    if ( $st !== '' ) {
+                        $out[] = $st;
+                    }
+                }
+            }
+
+            if ( ! empty( $el['elements'] ) && is_array( $el['elements'] ) ) {
+                $out = array_merge( $out, self::walk_elementor_elements_for_fp_types( $el['elements'] ) );
+            }
+        }
+        return $out;
     }
 
     /**
