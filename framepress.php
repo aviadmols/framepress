@@ -86,6 +86,10 @@ final class FramePress {
         );
         $this->global_settings  = new FramePress_Global_Settings();
 
+        // Google Fonts — load on both frontend and admin (preview iframe uses admin_head).
+        add_action( 'wp_head',    [ $this->global_settings, 'output_google_fonts' ], 1 );
+        add_action( 'admin_head', [ $this->global_settings, 'output_google_fonts' ], 1 );
+
         // Output hooks — frontend only.
         if ( ! is_admin() ) {
             add_action( 'wp_enqueue_scripts', [ $this->assets, 'enqueue_section_assets' ] );

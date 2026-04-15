@@ -26,8 +26,15 @@ return [
         'typography' => [
             'label' => 'Typography',
             'settings' => [
-                [ 'id' => 'font_body',        'type' => 'text',   'label' => 'Body Font Family',    'default' => 'sans-serif', 'var' => '--fp-font-body' ],
-                [ 'id' => 'font_heading',     'type' => 'text',   'label' => 'Heading Font Family', 'default' => 'sans-serif', 'var' => '--fp-font-heading' ],
+                [
+                    'id'          => 'google_fonts_url',
+                    'type'        => 'text',
+                    'label'       => 'Google Fonts URL',
+                    'default'     => '',
+                    'description' => 'Paste the CSS embed URL from fonts.google.com — e.g. https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap',
+                ],
+                [ 'id' => 'font_body',        'type' => 'text',   'label' => 'Body Font Family',    'default' => 'sans-serif', 'var' => '--fp-font-body',    'description' => 'Font name to use for body text (must match the Google Font name if using Google Fonts above)' ],
+                [ 'id' => 'font_heading',     'type' => 'text',   'label' => 'Heading Font Family', 'default' => 'sans-serif', 'var' => '--fp-font-heading', 'description' => 'Font name to use for headings (h1–h4)' ],
                 [ 'id' => 'font_size_base',   'type' => 'number', 'label' => 'Base Font Size (px)', 'default' => 16,           'var' => '--fp-font-size-base', 'unit' => 'px' ],
                 [ 'id' => 'line_height',      'type' => 'number', 'label' => 'Line Height',         'default' => 1.6,          'var' => '--fp-line-height' ],
                 [

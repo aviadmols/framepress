@@ -46,6 +46,25 @@ class FramePress_Global_Settings {
     // ─── Frontend output ──────────────────────────────────────────────────────
 
     /**
+     * Output Google Fonts <link> tag if a URL is configured.
+     * Hooked to wp_head and admin_head (priority 1, before styles).
+     * Only allows fonts.googleapis.com URLs for security.
+     */
+    public function output_google_fonts(): void {
+        $settings = $this->get_settings();
+        $url      = trim( $settings['google_fonts_url'] ?? '' );
+        if ( empty( $url ) ) {
+            return;
+        }
+        // Security: only allow the official Google Fonts CDN.
+        if ( ! preg_match( '#^https://fonts\.googleapis\.com/#', $url ) ) {
+            return;
+        }
+        echo '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' . "\n"; // phpcs:ignore
+        echo '<link rel="stylesheet" href="' . esc_url( $url ) . '">' . "\n"; // phpcs:ignore
+    }
+
+    /**
      * Output CSS custom properties + scoped custom CSS blocks.
      * Hooked to wp_head.
      */
