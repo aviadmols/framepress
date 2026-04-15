@@ -16,15 +16,24 @@ export default function Sidebar() {
             {/* Header */}
             <div className="fp-sidebar__header">
                 <span className="fp-sidebar__logo">FramePress</span>
-                { state.isDirty && (
-                    <button
-                        className="fp-btn-save"
-                        onClick={ save }
-                        disabled={ state.isSaving }
+                <div className="fp-sidebar__header-actions">
+                    <a
+                        href={ wpData.adminUrl + 'admin.php?page=framepress-global' }
+                        className="fp-icon-btn"
+                        title="Global Settings"
                     >
-                        { state.isSaving ? 'Saving…' : 'Save' }
-                    </button>
-                ) }
+                        ⚙
+                    </a>
+                    { state.isDirty && (
+                        <button
+                            className="fp-btn-save"
+                            onClick={ save }
+                            disabled={ state.isSaving }
+                        >
+                            { state.isSaving ? 'Saving…' : 'Save' }
+                        </button>
+                    ) }
+                </div>
             </div>
 
             {/* Context tabs */}
@@ -46,12 +55,6 @@ export default function Sidebar() {
                 <SectionList />
             </div>
 
-            {/* Footer links */}
-            <div className="fp-sidebar__footer">
-                <a href={ wpData.adminUrl + 'admin.php?page=framepress-global' } className="fp-sidebar__footer-link">
-                    ⚙ Global Settings
-                </a>
-            </div>
         </aside>
     );
 }
