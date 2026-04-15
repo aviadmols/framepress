@@ -64,6 +64,12 @@ class FramePress_Preview {
         $wp_query->queried_object    = $post;
         $wp_query->queried_object_id = $post_id;
 
+        // Hide the admin bar so it doesn't eat preview space.
+        add_filter( 'show_admin_bar', '__return_false' );
+        add_action( 'wp_head', function () {
+            echo '<style>html{margin-top:0!important}#wpadminbar{display:none!important}</style>';
+        }, 99 );
+
         // Inject preview JS listener at end of body so the editor can push
         // live updates via postMessage.
         add_action( 'wp_footer', [ $this, 'output_preview_listener' ], 99 );
@@ -92,12 +98,35 @@ class FramePress_Preview {
             /**
              * Swap or insert a section's HTML in the DOM.
              */
+            /**
+             * Return (or create) the FramePress sections container.
+             *
+             * Priority:
+             *  1. Already-injected .framepress-sections-container  (via the_content filter)
+             *  2. Create a new one and inject it before the page footer
+             *
+             * This makes the preview work even when Elementor or the active theme
+             * bypasses the WordPress the_content filter entirely.
+             */
             function getSectionsContainer() {
-                // Primary: our own named wrapper (always present in preview mode).
                 var c = document.querySelector('.framepress-sections-container');
                 if (c) return c;
-                // Fallbacks for themes that do not use the_content filter.
-                return document.querySelector('main .entry-content, .entry-content, main, #main, #content, body');
+
+                // Create a fresh container and inject it at a sensible location.
+                c = document.createElement('div');
+                c.className = 'framepress-sections-container';
+                c.style.cssText = 'position:relative;z-index:1;';
+
+                // Try to inject before site footer; fall back to end of body.
+                var anchor = document.querySelector(
+                    'footer, #footer, .footer, .site-footer, [class*="footer"]'
+                );
+                if (anchor && anchor.parentNode) {
+                    anchor.parentNode.insertBefore(c, anchor);
+                } else {
+                    document.body.appendChild(c);
+                }
+                return c;
             }
 
             function applySection(sectionId, html) {
@@ -111,11 +140,8 @@ class FramePress_Preview {
                     }
                 } else {
                     var container = getSectionsContainer();
-                    if (container) {
-                        // Remove the empty-state class once a real section lands.
-                        container.classList.remove('framepress-sections-container--empty');
-                        container.insertAdjacentHTML('beforeend', html);
-                    }
+                    container.classList.remove('framepress-sections-container--empty');
+                    container.insertAdjacentHTML('beforeend', html);
                 }
             }
 
@@ -212,12 +238,16 @@ class FramePress_Preview {
                     }
                 });
 
-                // Render/update each instance.
+                // Render/update each instance, then reorder once all are in the DOM.
+                var pending = instances.length;
+                if (pending === 0) return;
                 instances.forEach(function(instance) {
                     fetchSectionHtml(instance, function(html) {
                         applySection(instance.id, html);
-                        // After all individual updates, reorder.
-                        reorderSections(orderedIds);
+                        pending--;
+                        if (pending === 0) {
+                            reorderSections(orderedIds);
+                        }
                     });
                 });
 
