@@ -477,6 +477,10 @@ MSG;
      * The master system prompt for section file generation.
      * Embedded directly so every AI call for section creation uses the exact same rules.
      */
+    public function get_section_files_system_prompt(): string {
+        return $this->build_section_files_system_prompt();
+    }
+
     private function build_section_files_system_prompt(): string {
         return <<<'PROMPT'
 You are building PHP section files for a WordPress plugin called FramePress.

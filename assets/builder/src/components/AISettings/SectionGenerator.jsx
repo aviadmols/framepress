@@ -26,8 +26,12 @@ export default function SectionGenerator() {
     const [ error,       setError       ] = useState( '' );
     const [ installed,   setInstalled   ] = useState( false );
     const [ installing,  setInstalling  ] = useState( false );
-    const [ fixing,      setFixing      ] = useState( false );
+    const [ fixing,       setFixing       ] = useState( false );
     const [ installError, setInstallError ] = useState( '' );
+    const [ showPrompt,   setShowPrompt   ] = useState( false );
+    const [ prompt,       setPrompt       ] = useState( '' );
+    const [ promptLoading, setPromptLoading ] = useState( false );
+    const [ copied,       setCopied       ] = useState( false );
 
     async function generate() {
         setLoading( true );
@@ -103,6 +107,29 @@ export default function SectionGenerator() {
         }
     }
 
+    async function togglePrompt() {
+        if ( showPrompt ) { setShowPrompt( false ); return; }
+        setShowPrompt( true );
+        if ( prompt ) return;
+        setPromptLoading( true );
+        try {
+            const res  = await fetch( REST() + '/ai/section-files-prompt', { headers: { 'X-WP-Nonce': NONCE() } } );
+            const data = await res.json();
+            setPrompt( data.prompt || '' );
+        } catch ( e ) {
+            setPrompt( '// Could not load prompt: ' + e.message );
+        } finally {
+            setPromptLoading( false );
+        }
+    }
+
+    function copyPrompt() {
+        navigator.clipboard.writeText( prompt ).then( () => {
+            setCopied( true );
+            setTimeout( () => setCopied( false ), 2000 );
+        } );
+    }
+
     const inputReady = mode === 'html' ? html.trim().length > 0 : description.trim().length > 10;
 
     return (
@@ -165,6 +192,27 @@ export default function SectionGenerator() {
             </div>
 
             { error && <p className="fp-sg__error">{ error }</p> }
+
+            {/* System prompt panel */}
+            <div className="fp-sg__prompt-section">
+                <button className="fp-sg__prompt-toggle" onClick={ togglePrompt }>
+                    { showPrompt ? '▲ Hide system prompt' : '▼ View system prompt for external AI' }
+                </button>
+                { showPrompt && (
+                    <div className="fp-sg__prompt-panel">
+                        <div className="fp-sg__prompt-toolbar">
+                            <span className="fp-sg__prompt-hint">Copy this prompt into ChatGPT, Claude, Gemini, etc. Then add your description or HTML at the end.</span>
+                            <button className="fp-sg__copy-btn" onClick={ copyPrompt } disabled={ ! prompt }>
+                                { copied ? '✓ Copied!' : 'Copy' }
+                            </button>
+                        </div>
+                        { promptLoading
+                            ? <p className="fp-sg__prompt-loading">Loading…</p>
+                            : <textarea className="fp-sg__prompt-text" readOnly value={ prompt } spellCheck={ false } />
+                        }
+                    </div>
+                ) }
+            </div>
 
             {/* Result preview */}
             { result && (

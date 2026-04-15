@@ -151,6 +151,13 @@ class FramePress_Rest_API {
             'permission_callback' => [ $this, 'admin_permission' ],
         ] );
 
+        // Return the system prompt used for section file generation (for external AI tools).
+        register_rest_route( self::NS, '/ai/section-files-prompt', [
+            'methods'             => 'GET',
+            'callback'            => [ $this, 'ai_get_section_files_prompt' ],
+            'permission_callback' => [ $this, 'admin_permission' ],
+        ] );
+
         // Fix broken AI-generated section files using AI.
         register_rest_route( self::NS, '/ai/fix-section-files', [
             'methods'             => 'POST',
@@ -498,6 +505,15 @@ class FramePress_Rest_API {
         }
 
         return rest_ensure_response( $result );
+    }
+
+    /**
+     * Return the system prompt used for section file generation.
+     * Allows users to copy it and use it with external AI tools.
+     */
+    public function ai_get_section_files_prompt(): \WP_REST_Response {
+        $ai = new FramePress_AI_Service();
+        return rest_ensure_response( [ 'prompt' => $ai->get_section_files_system_prompt() ] );
     }
 
     /**

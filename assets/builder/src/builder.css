@@ -924,6 +924,76 @@
     gap: 4px;
 }
 
+/* ── Section Generator: system prompt panel ─────────────────────────────── */
+
+.fp-sg__prompt-section {
+    border: 1px solid #e1e3e5;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #fff;
+}
+
+.fp-sg__prompt-toggle {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 10px 16px;
+    background: none;
+    border: none;
+    font-size: 12px;
+    color: #6d7175;
+    cursor: pointer;
+    transition: background 0.1s;
+}
+.fp-sg__prompt-toggle:hover { background: #f6f6f7; color: #202223; }
+
+.fp-sg__prompt-panel { border-top: 1px solid #e1e3e5; }
+
+.fp-sg__prompt-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 14px;
+    background: #f6f6f7;
+    border-bottom: 1px solid #e1e3e5;
+}
+
+.fp-sg__prompt-hint { font-size: 11px; color: #6d7175; flex: 1; }
+
+.fp-sg__copy-btn {
+    padding: 4px 12px;
+    background: #2c6ecb;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s;
+}
+.fp-sg__copy-btn:hover:not(:disabled) { background: #1f5299; }
+.fp-sg__copy-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.fp-sg__prompt-text {
+    display: block;
+    width: 100%;
+    min-height: 240px;
+    max-height: 420px;
+    padding: 14px 16px;
+    font-size: 11px;
+    font-family: 'Fira Code', Consolas, monospace;
+    line-height: 1.6;
+    color: #202223;
+    background: #fafbfb;
+    border: none;
+    resize: vertical;
+    outline: none;
+}
+
+.fp-sg__prompt-loading { padding: 12px 16px; font-size: 12px; color: #6d7175; margin: 0; }
+
 /* ── Section Generator: install error + fix button ──────────────────────── */
 
 .fp-sg__install-error {
