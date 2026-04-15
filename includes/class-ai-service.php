@@ -402,8 +402,21 @@ MSG;
             return $php;
         };
 
-        $schema_content  = "<?php\ndefined( 'ABSPATH' ) || exit;\n\nreturn " . $strip_open( $schema_php );
-        $section_content = "<?php\ndefined( 'ABSPATH' ) || exit;\n\n" . $strip_open( $section_php );
+        $schema_content = "<?php\ndefined( 'ABSPATH' ) || exit;\n\nreturn " . $strip_open( $schema_php );
+
+        // section.php can be either a pure-PHP file or an HTML template with embedded PHP tags.
+        // If the stripped content starts with '<' it's HTML-first — we must close the PHP block
+        // immediately after the security check so PHP switches back to HTML output mode.
+        // If it starts with PHP code (variables, function calls, etc.) we keep PHP mode open.
+        $section_raw   = $strip_open( $section_php );
+        $first_char    = ltrim( $section_raw )[0] ?? '';
+        if ( $first_char === '<' ) {
+            // HTML-first template: <?php defined(...); ?> then HTML
+            $section_content = "<?php defined( 'ABSPATH' ) || exit; ?>\n" . $section_raw;
+        } else {
+            // PHP-first file: keep PHP block open
+            $section_content = "<?php\ndefined( 'ABSPATH' ) || exit;\n\n" . $section_raw;
+        }
 
         // Validate schema is syntactically safe (no function calls, no includes).
         if ( preg_match( '/\b(include|require|eval|exec|system|passthru|shell_exec|popen|proc_open)\s*[(\s]/i', $schema_php ) ) {
