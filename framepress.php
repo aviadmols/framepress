@@ -181,6 +181,11 @@ function framepress_bootstrap_elementor(): void {
     if ( empty( $gs['elementor_widgets_enabled'] ) ) {
         return;
     }
+    // Prevent PHP warnings/notices from corrupting JSON in Elementor AJAX responses (admin-ajax.php).
+    if ( defined( 'DOING_AJAX' ) && DOING_AJAX ) {
+        // phpcs:ignore WordPress.PHP.IniSet.display_errors_Disallowed -- scoped to AJAX; errors still go to log.
+        @ini_set( 'display_errors', '0' );
+    }
     require_once FRAMEPRESS_DIR . 'includes/class-elementor-integration.php';
     FramePress_Elementor_Integration::init();
     $done = true;

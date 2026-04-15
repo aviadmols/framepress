@@ -178,6 +178,10 @@ class FramePress_Elementor_Section_Widget extends \Elementor\Widget_Base {
                 ];
                 break;
             case 'select':
+                // Builder uses options_source (wp_menus, wp_categories) — no static options for Elementor SELECT.
+                if ( ! empty( $field['options_source'] ) && empty( $field['options'] ) ) {
+                    return;
+                }
                 $control['type']    = \Elementor\Controls_Manager::SELECT;
                 $control['options'] = $this->select_options_for_elementor( $field['options'] ?? [] );
                 $control['default'] = (string) ( $field['default'] ?? '' );
