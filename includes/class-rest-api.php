@@ -55,13 +55,13 @@ class FramePress_Rest_API {
                 'methods'             => 'GET',
                 'callback'            => [ $this, 'get_page_sections' ],
                 'permission_callback' => [ $this, 'editor_permission' ],
-                'args'                => [ 'id' => [ 'validate_callback' => 'is_numeric' ] ],
+                'args'                => [ 'id' => [ 'validate_callback' => static fn( $v ) => is_numeric( $v ) ] ],
             ],
             [
                 'methods'             => 'POST',
                 'callback'            => [ $this, 'save_page_sections' ],
                 'permission_callback' => [ $this, 'editor_permission' ],
-                'args'                => [ 'id' => [ 'validate_callback' => 'is_numeric' ] ],
+                'args'                => [ 'id' => [ 'validate_callback' => static fn( $v ) => is_numeric( $v ) ] ],
             ],
         ] );
 
