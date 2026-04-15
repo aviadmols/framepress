@@ -332,9 +332,11 @@ class FramePress_AI_Service {
             return new \WP_Error( 'mkdir_failed', __( 'Could not create section directory.', 'framepress' ) );
         }
 
-        // Strip any <?php opening tag the AI might have included before we add our own.
+        // Strip any <?php opening tag and leading `return` keyword the AI might have included.
         $strip_open = static function ( string $php ): string {
-            return ltrim( preg_replace( '/^<\?php\s*/i', '', trim( $php ) ) );
+            $php = ltrim( preg_replace( '/^<\?php\s*/i', '', trim( $php ) ) );
+            $php = preg_replace( '/^return\s+/i', '', $php );
+            return $php;
         };
 
         $schema_content  = "<?php\ndefined( 'ABSPATH' ) || exit;\n\nreturn " . $strip_open( $schema_php );
@@ -345,8 +347,12 @@ class FramePress_AI_Service {
             return new \WP_Error( 'unsafe_schema', __( 'AI-generated schema contains unsafe PHP constructs.', 'framepress' ) );
         }
 
-        file_put_contents( $dir . 'schema.php',  $schema_content );
-        file_put_contents( $dir . 'section.php', $section_content );
+        if ( file_put_contents( $dir . 'schema.php', $schema_content ) === false ) {
+            return new \WP_Error( 'write_failed', __( 'Could not write schema.php — check uploads directory permissions.', 'framepress' ) );
+        }
+        if ( file_put_contents( $dir . 'section.php', $section_content ) === false ) {
+            return new \WP_Error( 'write_failed', __( 'Could not write section.php — check uploads directory permissions.', 'framepress' ) );
+        }
 
         if ( ! empty( $style_css ) ) {
             file_put_contents( $dir . 'style.css', $style_css );
