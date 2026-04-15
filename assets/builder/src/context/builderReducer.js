@@ -10,6 +10,7 @@ export const initialState = {
     globalSchema:      null,
     isDirty:           false,
     isSaving:          false,
+    saveError:         null,
     previewMode:       'desktop',   // 'desktop' | 'mobile'
     context:           'page',      // 'page' | 'header' | 'footer'
     postId:            null,
@@ -181,9 +182,9 @@ export function builderReducer( state, action ) {
 
         // ── Save lifecycle ────────────────────────────────────────────────────
 
-        case 'SAVE_START':   return { ...state, isSaving: true };
-        case 'SAVE_SUCCESS': return { ...state, isSaving: false, isDirty: false };
-        case 'SAVE_ERROR':   return { ...state, isSaving: false };
+        case 'SAVE_START':   return { ...state, isSaving: true, saveError: null };
+        case 'SAVE_SUCCESS': return { ...state, isSaving: false, isDirty: false, saveError: null };
+        case 'SAVE_ERROR':   return { ...state, isSaving: false, saveError: action.message || 'Save failed. Check your connection and try again.' };
 
         default:
             return state;

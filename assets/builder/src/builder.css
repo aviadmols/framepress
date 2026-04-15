@@ -657,7 +657,8 @@
     white-space: nowrap;
 }
 
-.fp-save-bar__msg { font-size: 13px; color: #6d7175; }
+.fp-save-bar__msg   { font-size: 13px; color: #6d7175; }
+.fp-save-bar__error { font-size: 13px; color: #d72c0d; font-weight: 500; }
 .fp-save-bar__actions { display: flex; gap: 8px; }
 
 /* ── Section list empty state ────────────────────────────────────────────── */

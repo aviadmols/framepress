@@ -3,11 +3,14 @@ import { useBuilder } from '../context/BuilderContext';
 export default function SaveBar() {
     const { state, dispatch, save } = useBuilder();
 
-    if ( ! state.isDirty ) return null;
+    if ( ! state.isDirty && ! state.saveError ) return null;
 
     return (
         <div className="fp-save-bar">
-            <span className="fp-save-bar__msg">You have unsaved changes.</span>
+            { state.saveError
+                ? <span className="fp-save-bar__error">⚠ { state.saveError }</span>
+                : <span className="fp-save-bar__msg">You have unsaved changes.</span>
+            }
             <div className="fp-save-bar__actions">
                 <button
                     className="fp-btn-secondary"

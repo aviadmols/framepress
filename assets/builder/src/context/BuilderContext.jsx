@@ -68,7 +68,7 @@ export function BuilderProvider( { children } ) {
             dispatch( { type: 'SAVE_SUCCESS' } );
         } catch ( e ) {
             console.error( '[FramePress] Save failed', e );
-            dispatch( { type: 'SAVE_ERROR' } );
+            dispatch( { type: 'SAVE_ERROR', message: e.message } );
         }
     };
 
