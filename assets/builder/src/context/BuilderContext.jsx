@@ -18,8 +18,10 @@ export function BuilderProvider( { children } ) {
     useEffect( () => {
         const load = async () => {
             try {
+                const fd            = window.framepressData || {};
+                const schemaContext = fd.context === 'elementor-section' ? 'page' : ( fd.context || 'page' );
                 const [ schemasData, blocksData, globalData ] = await Promise.all( [
-                    api.getSchemas( state.context ),
+                    api.getSchemas( schemaContext ),
                     api.getBlocks(),
                     api.getGlobalSettings(),
                 ] );
@@ -47,6 +49,16 @@ export function BuilderProvider( { children } ) {
                     sections = await api.getHeader();
                 } else if ( state.context === 'footer' ) {
                     sections = await api.getFooter();
+                } else if ( state.context === 'elementor-section' ) {
+                    const fd = window.framepressData || {};
+                    if ( fd.elementorSectionKey && fd.postId && fd.sectionType ) {
+                        const data = await api.getElementorSection(
+                            fd.elementorSectionKey,
+                            fd.postId,
+                            fd.sectionType
+                        );
+                        sections = data.sections || [];
+                    }
                 }
                 dispatch( { type: 'LOAD_SECTIONS', sections } );
             } catch ( e ) {
@@ -69,6 +81,14 @@ export function BuilderProvider( { children } ) {
                 await api.saveFooter( state.sections );
             } else if ( state.context === 'global' ) {
                 await api.saveGlobalSettings( state.globalSettings );
+            } else if ( state.context === 'elementor-section' ) {
+                const fd = window.framepressData || {};
+                await api.saveElementorSection(
+                    fd.elementorSectionKey,
+                    fd.postId,
+                    fd.sectionType,
+                    state.sections
+                );
             }
             dispatch( { type: 'SAVE_SUCCESS' } );
         } catch ( e ) {

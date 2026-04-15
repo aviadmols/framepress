@@ -41,36 +41,53 @@ class FramePress_Section_Assets {
         $active_types = $this->renderer->get_active_section_types();
 
         foreach ( $active_types as $type ) {
-            $schema = $this->registry->get_section( $type );
-            if ( ! $schema ) {
-                continue;
-            }
+            $this->enqueue_one_section_type( $type );
+        }
+    }
 
-            $section_path = $schema['_path'];
-            $section_url  = $this->path_to_url( $section_path, $schema['_source'] ?? 'plugin' );
+    /**
+     * Enqueue style/script for a single section type (e.g. Elementor widget output).
+     */
+    public function enqueue_one_section_type( string $type ): void {
+        $schema = $this->registry->get_section( $type );
+        if ( ! $schema ) {
+            return;
+        }
 
-            // style.css
-            $css_file = $section_path . 'style.css';
-            if ( file_exists( $css_file ) ) {
+        if ( ! wp_style_is( 'framepress-frontend', 'enqueued' ) ) {
+            $base_css = FRAMEPRESS_DIR . 'assets/frontend/framepress.css';
+            if ( file_exists( $base_css ) ) {
                 wp_enqueue_style(
-                    'framepress-section-' . $type,
-                    $section_url . 'style.css',
-                    [ 'framepress-frontend' ],
-                    (string) filemtime( $css_file )
-                );
-            }
-
-            // script.js
-            $js_file = $section_path . 'script.js';
-            if ( file_exists( $js_file ) ) {
-                wp_enqueue_script(
-                    'framepress-section-' . $type,
-                    $section_url . 'script.js',
+                    'framepress-frontend',
+                    FRAMEPRESS_URL . 'assets/frontend/framepress.css',
                     [],
-                    (string) filemtime( $js_file ),
-                    true   // in footer
+                    filemtime( $base_css )
                 );
             }
+        }
+
+        $section_path = $schema['_path'];
+        $section_url    = $this->path_to_url( $section_path, $schema['_source'] ?? 'plugin' );
+
+        $css_file = $section_path . 'style.css';
+        if ( file_exists( $css_file ) ) {
+            wp_enqueue_style(
+                'framepress-section-' . $type,
+                $section_url . 'style.css',
+                [ 'framepress-frontend' ],
+                (string) filemtime( $css_file )
+            );
+        }
+
+        $js_file = $section_path . 'script.js';
+        if ( file_exists( $js_file ) ) {
+            wp_enqueue_script(
+                'framepress-section-' . $type,
+                $section_url . 'script.js',
+                [],
+                (string) filemtime( $js_file ),
+                true
+            );
         }
     }
 

@@ -42,6 +42,17 @@ export const api = {
     getGlobalSettings:  ()                 => request( 'global-settings' ),
     saveGlobalSettings: ( settings )       => request( 'global-settings', { method: 'POST', body: JSON.stringify( { settings } ) } ),
 
+    // ── Elementor widget (single section in wp_options) ───────────────────────
+    getElementorSection: ( key, postId, sectionType ) =>
+        request(
+            `elementor-section/${ key }?post_id=${ postId }&section_type=${ encodeURIComponent( sectionType ) }`
+        ),
+    saveElementorSection: ( key, postId, sectionType, sections ) =>
+        request( `elementor-section/${ key }`, {
+            method: 'POST',
+            body:   JSON.stringify( { post_id: postId, section_type: sectionType, sections } ),
+        } ),
+
     // ── Live preview ──────────────────────────────────────────────────────────
     renderSection:    ( instance )         => request( 'render-section', { method: 'POST', body: JSON.stringify( { instance } ) } ),
 

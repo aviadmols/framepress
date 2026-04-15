@@ -20,6 +20,7 @@ import SectionPicker        from '../SectionPicker/SectionPicker';
 export default function SectionList() {
     const { state, dispatch } = useBuilder();
     const [ pickerOpen, setPickerOpen ] = useState( false );
+    const isElementorEmbed = ( window.framepressData?.context ) === 'elementor-section';
 
     const sensors = useSensors(
         useSensor( PointerSensor ),
@@ -41,9 +42,11 @@ export default function SectionList() {
         return (
             <div className="fp-section-list fp-section-list--empty">
                 <p className="fp-section-list__empty-msg">No sections yet.</p>
-                <button className="fp-btn-add-section" onClick={ () => setPickerOpen( true ) }>
-                    + Add Section
-                </button>
+                { ! isElementorEmbed && (
+                    <button className="fp-btn-add-section" onClick={ () => setPickerOpen( true ) }>
+                        + Add Section
+                    </button>
+                ) }
                 { pickerOpen && <SectionPicker onClose={ () => setPickerOpen( false ) } /> }
             </div>
         );
@@ -58,14 +61,17 @@ export default function SectionList() {
                             key={ section.id }
                             section={ section }
                             schema={ schemaMap[ section.type ] }
+                            isElementorEmbed={ isElementorEmbed }
                         />
                     ) ) }
                 </SortableContext>
             </DndContext>
 
-            <button className="fp-btn-add-section" onClick={ () => setPickerOpen( true ) }>
-                + Add Section
-            </button>
+            { ! isElementorEmbed && (
+                <button className="fp-btn-add-section" onClick={ () => setPickerOpen( true ) }>
+                    + Add Section
+                </button>
+            ) }
 
             { pickerOpen && <SectionPicker onClose={ () => setPickerOpen( false ) } /> }
         </div>

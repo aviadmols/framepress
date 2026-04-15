@@ -157,3 +157,12 @@ add_action( 'switch_theme', function () {
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 
 add_action( 'plugins_loaded', [ FramePress::class, 'get_instance' ] );
+
+// Elementor: load integration only when Elementor is active (avoids fatal if plugin missing).
+add_action(
+    'elementor/loaded',
+    static function (): void {
+        require_once FRAMEPRESS_DIR . 'includes/class-elementor-integration.php';
+        FramePress_Elementor_Integration::init();
+    }
+);

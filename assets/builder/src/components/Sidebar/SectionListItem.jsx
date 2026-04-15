@@ -2,11 +2,14 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS }         from '@dnd-kit/utilities';
 import { useBuilder }  from '../../context/BuilderContext';
 
-export default function SectionListItem( { section, schema } ) {
+export default function SectionListItem( { section, schema, isElementorEmbed = false } ) {
     const { state, dispatch } = useBuilder();
     const isSelected          = state.selectedSectionId === section.id;
 
-    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable( { id: section.id } );
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable( {
+        id:       section.id,
+        disabled: isElementorEmbed,
+    } );
 
     const style = {
         transform:  CSS.Transform.toString( transform ),
@@ -24,15 +27,17 @@ export default function SectionListItem( { section, schema } ) {
             onClick={ () => dispatch( { type: 'SELECT_SECTION', id: section.id } ) }
         >
             {/* Drag handle */}
-            <span
-                className="fp-section-item__handle"
-                { ...attributes }
-                { ...listeners }
-                onClick={ e => e.stopPropagation() }
-                title="Drag to reorder"
-            >
-                ⠿
-            </span>
+            { ! isElementorEmbed && (
+                <span
+                    className="fp-section-item__handle"
+                    { ...attributes }
+                    { ...listeners }
+                    onClick={ e => e.stopPropagation() }
+                    title="Drag to reorder"
+                >
+                    ⠿
+                </span>
+            ) }
 
             <span className="fp-section-item__label">{ label }</span>
 
@@ -46,18 +51,20 @@ export default function SectionListItem( { section, schema } ) {
                     { section.enabled ? '●' : '○' }
                 </button>
 
-                {/* Delete */}
-                <button
-                    className="fp-icon-btn fp-icon-btn--danger"
-                    onClick={ () => {
-                        if ( window.confirm( `Remove "${ label }"?` ) ) {
-                            dispatch( { type: 'REMOVE_SECTION', id: section.id } );
-                        }
-                    } }
-                    title="Remove section"
-                >
-                    ✕
-                </button>
+                {/* Delete — not for Elementor embed (single fixed instance) */}
+                { ! isElementorEmbed && (
+                    <button
+                        className="fp-icon-btn fp-icon-btn--danger"
+                        onClick={ () => {
+                            if ( window.confirm( `Remove "${ label }"?` ) ) {
+                                dispatch( { type: 'REMOVE_SECTION', id: section.id } );
+                            }
+                        } }
+                        title="Remove section"
+                    >
+                        ✕
+                    </button>
+                ) }
             </div>
         </div>
     );

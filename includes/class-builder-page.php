@@ -44,6 +44,29 @@ class FramePress_Builder_Page {
 
     /** Hub: list of pages with "Edit with FramePress" links — or the builder if post_id is set. */
     public function render_hub_page(): void {
+        // Elementor widget → FramePress editor (single section instance).
+        if ( isset( $_GET['context'] ) && $_GET['context'] === 'elementor-section' && ! empty( $_GET['section_key'] ) ) {
+            $key     = sanitize_text_field( wp_unslash( $_GET['section_key'] ?? '' ) );
+            $type    = sanitize_key( $_GET['section_type'] ?? '' );
+            $post_id = absint( $_GET['elementor_post_id'] ?? 0 );
+            if ( strlen( $key ) !== 32 || ! ctype_xdigit( $key ) || $type === '' || ! $post_id ) {
+                wp_die( esc_html__( 'Invalid FramePress link.', 'framepress' ), '', [ 'response' => 400 ] );
+            }
+            if ( ! current_user_can( 'edit_post', $post_id ) ) {
+                wp_die( esc_html__( 'You do not have permission to edit this content.', 'framepress' ), '', [ 'response' => 403 ] );
+            }
+            $this->enqueue_builder_assets(
+                $post_id,
+                'elementor-section',
+                [
+                    'elementorSectionKey' => $key,
+                    'sectionType'         => $type,
+                ]
+            );
+            require_once FRAMEPRESS_DIR . 'templates/builder.php';
+            return;
+        }
+
         // If a post_id is present, render the full builder for that page.
         if ( isset( $_GET['post_id'] ) && absint( $_GET['post_id'] ) > 0 ) {
             $context = isset( $_GET['context'] ) ? sanitize_key( $_GET['context'] ) : 'page';
@@ -95,7 +118,7 @@ class FramePress_Builder_Page {
             $post_id = absint( $_GET['post_id'] );
         }
 
-        $this->enqueue_builder_assets( $post_id, $context );
+        $this->enqueue_builder_assets( $post_id, $context, [] );
 
         // Output bare page — no WP admin header/footer.
         require_once FRAMEPRESS_DIR . 'templates/builder.php';
@@ -103,7 +126,7 @@ class FramePress_Builder_Page {
 
     // ─── Asset enqueueing ─────────────────────────────────────────────────────
 
-    private function enqueue_builder_assets( int $post_id, string $context ): void {
+    private function enqueue_builder_assets( int $post_id, string $context, array $extra = [] ): void {
         // Required for WP media picker.
         wp_enqueue_media();
 
@@ -140,32 +163,40 @@ class FramePress_Builder_Page {
             wp_enqueue_script( 'framepress-builder', FRAMEPRESS_URL . $js_file, [], FRAMEPRESS_VERSION, true );
         }
 
-        // Pass data to React.
-        $preview_nonce = $post_id ? wp_create_nonce( 'framepress_preview_' . $post_id ) : '';
-        $preview_url   = $post_id
+        // Pass data to React. Live preview iframe should load the real page (Elementor + widget), not elementor-section bridge scope.
+        $preview_context = $context === 'elementor-section' ? 'page' : $context;
+        $preview_nonce   = $post_id ? wp_create_nonce( 'framepress_preview_' . $post_id ) : '';
+        $preview_url     = $post_id
             ? add_query_arg( [
                 'framepress_preview' => 1,
                 'post_id'            => $post_id,
-                'context'            => $context,
+                'context'            => $preview_context,
                 'nonce'              => $preview_nonce,
             ], get_permalink( $post_id ) ?: home_url( '/' ) )
             : add_query_arg( [
                 'framepress_preview' => 1,
                 'post_id'            => 0,
-                'context'            => $context,
+                'context'            => $preview_context,
                 'nonce'              => wp_create_nonce( 'framepress_preview_0' ),
             ], home_url( '/' ) );
 
-        wp_localize_script( 'framepress-builder', 'framepressData', [
-            'restUrl'        => rest_url( 'framepress/v1' ),
-            'nonce'          => wp_create_nonce( 'wp_rest' ),
-            'postId'         => $post_id,
-            'context'        => $context,
-            'previewUrl'     => $preview_url,
-            'adminUrl'       => admin_url(),
-            'version'        => FRAMEPRESS_VERSION,
-            'aiEnabled'      => (bool) get_option( 'framepress_ai_enabled', false ),
-        ] );
+        $framepress_data = array_merge(
+            [
+                'restUrl'             => rest_url( 'framepress/v1' ),
+                'nonce'               => wp_create_nonce( 'wp_rest' ),
+                'postId'              => $post_id,
+                'context'             => $context,
+                'previewUrl'          => $preview_url,
+                'adminUrl'            => admin_url(),
+                'version'             => FRAMEPRESS_VERSION,
+                'aiEnabled'           => (bool) get_option( 'framepress_ai_enabled', false ),
+                'elementorSectionKey' => '',
+                'sectionType'         => '',
+            ],
+            $extra
+        );
+
+        wp_localize_script( 'framepress-builder', 'framepressData', $framepress_data );
     }
 
     // ─── Utility ──────────────────────────────────────────────────────────────

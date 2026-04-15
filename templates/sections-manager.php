@@ -35,6 +35,9 @@ window.framepressSMData = <?php echo wp_json_encode( [
                 <input id="fps-new-slug"  type="text" class="widefat" placeholder="e.g. my-hero" />
                 <label class="fps-sm-new-label" style="margin-top:6px">Label</label>
                 <input id="fps-new-label-input" type="text" class="widefat" placeholder="e.g. My Hero" />
+                <label class="fps-sm-new-label" style="margin-top:6px">Section ZIP (optional)</label>
+                <input id="fps-new-zip" type="file" accept=".zip,application/zip" />
+                <p class="fps-sm-new-hint">ZIP must include <code>schema.php</code> and <code>section.php</code>. The <code>type</code> in schema must match the section slug.</p>
                 <p id="fps-new-section-error" class="fps-sm-new-error" hidden></p>
                 <div class="fps-sm-new-actions">
                     <button id="fps-new-section-submit" class="button button-primary">Create</button>
@@ -130,6 +133,8 @@ window.framepressSMData = <?php echo wp_json_encode( [
     gap: 4px;
 }
 .fps-sm-new-label { font-size: 11px; font-weight: 600; color: #50575e; }
+.fps-sm-new-hint { font-size: 12px; color: #646970; margin: 4px 0 0; line-height: 1.45; }
+.fps-sm-new-hint code { font-size: 11px; }
 .fps-sm-new-error { font-size: 12px; color: #cc1818; margin: 4px 0 0; }
 .fps-sm-new-actions { display: flex; gap: 6px; margin-top: 6px; }
 
@@ -349,6 +354,7 @@ window.framepressSMData = <?php echo wp_json_encode( [
         newSubmit:    document.getElementById('fps-new-section-submit'),
         newCancel:    document.getElementById('fps-new-section-cancel'),
         newError:     document.getElementById('fps-new-section-error'),
+        newZip:       document.getElementById('fps-new-zip'),
     };
 
     // ── API helper ─────────────────────────────────────────────────────────
@@ -358,6 +364,19 @@ window.framepressSMData = <?php echo wp_json_encode( [
         opts.headers['Content-Type'] = 'application/json';
         opts.credentials = 'same-origin';
         var res = await fetch(REST + path, opts);
+        var data = await res.json().catch(function () { return {}; });
+        if (!res.ok) throw new Error(data.error || data.message || res.statusText);
+        return data;
+    }
+
+    /** Multipart upload (do not set Content-Type — browser sets boundary). */
+    async function apiUpload(path, formData) {
+        var res = await fetch(REST + path, {
+            method:      'POST',
+            headers:     { 'X-WP-Nonce': NONCE },
+            credentials: 'same-origin',
+            body:        formData,
+        });
         var data = await res.json().catch(function () { return {}; });
         if (!res.ok) throw new Error(data.error || data.message || res.statusText);
         return data;
@@ -658,6 +677,7 @@ window.framepressSMData = <?php echo wp_json_encode( [
         els.newBtn.hidden   = false;
         els.newSlug.value   = '';
         els.newLabel.value  = '';
+        if (els.newZip) els.newZip.value = '';
         els.newError.hidden = true;
     }
 
@@ -680,14 +700,22 @@ window.framepressSMData = <?php echo wp_json_encode( [
         els.newSubmit.textContent = 'Creating…';
 
         try {
-            var res = await apiFetch('/sections-manager/create', {
-                method: 'POST',
-                body:   JSON.stringify({ slug: slug, label: label }),
-            });
+            var res;
+            if (els.newZip && els.newZip.files && els.newZip.files.length) {
+                var fd = new FormData();
+                fd.append('section_zip', els.newZip.files[0]);
+                fd.append('slug', slug);
+                res = await apiUpload('/sections/upload', fd);
+            } else {
+                res = await apiFetch('/sections-manager/create', {
+                    method: 'POST',
+                    body:   JSON.stringify({ slug: slug, label: label }),
+                });
+            }
 
             resetNewForm();
             await fetchSections();
-            selectSection(res.type || slug);
+            selectSection(res.type || res.slug || slug);
         } catch (e) {
             showNewError(e.message || 'Could not create section.');
         } finally {

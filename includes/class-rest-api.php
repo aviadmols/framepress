@@ -77,6 +77,20 @@ class FramePress_Rest_API {
             [ 'methods' => 'POST', 'callback' => [ $this, 'save_footer' ], 'permission_callback' => [ $this, 'editor_permission' ] ],
         ] );
 
+        // ── Elementor widget instance (single section JSON in wp_options) ─────
+        register_rest_route( self::NS, '/elementor-section/(?P<key>[a-f0-9]{32})', [
+            [
+                'methods'             => 'GET',
+                'callback'            => [ $this, 'get_elementor_section' ],
+                'permission_callback' => [ $this, 'editor_permission' ],
+            ],
+            [
+                'methods'             => 'POST',
+                'callback'            => [ $this, 'save_elementor_section' ],
+                'permission_callback' => [ $this, 'editor_permission' ],
+            ],
+        ] );
+
         // ── Global settings ───────────────────────────────────────────────────
         register_rest_route( self::NS, '/global-settings', [
             [ 'methods' => 'GET',  'callback' => [ $this, 'get_global_settings' ],  'permission_callback' => [ $this, 'editor_permission' ] ],
@@ -101,7 +115,7 @@ class FramePress_Rest_API {
         register_rest_route( self::NS, '/sections/upload', [
             'methods'             => 'POST',
             'callback'            => [ $this, 'upload_section' ],
-            'permission_callback' => [ $this, 'admin_permission' ],
+            'permission_callback' => [ $this, 'editor_permission' ],
         ] );
 
         register_rest_route( self::NS, '/sections/(?P<type>[a-z0-9\-]+)', [
@@ -312,6 +326,77 @@ class FramePress_Rest_API {
             'schema'      => $this->global_settings->get_schema(),
             'googleFonts' => $this->global_settings->get_google_fonts_catalog(),
         ] );
+    }
+
+    /**
+     * Load a single FramePress section instance used by an Elementor widget (wp_options).
+     */
+    public function get_elementor_section( \WP_REST_Request $request ): \WP_REST_Response {
+        $key          = (string) ( $request['key'] ?? '' );
+        $post_id      = absint( $request->get_param( 'post_id' ) );
+        $section_type = sanitize_key( $request->get_param( 'section_type' ) ?: '' );
+
+        if ( ! preg_match( '/^[a-f0-9]{32}$/', $key ) || ! $post_id || $section_type === '' ) {
+            return new \WP_REST_Response( [ 'error' => 'Invalid request' ], 400 );
+        }
+
+        if ( ! current_user_can( 'edit_post', $post_id ) ) {
+            return new \WP_REST_Response( [ 'error' => 'Forbidden' ], 403 );
+        }
+
+        $raw  = get_option( 'framepress_el_' . $key, '' );
+        $data = $raw ? json_decode( $raw, true ) : [];
+
+        if ( ! is_array( $data ) || empty( $data ) ) {
+            $data = [
+                'id'         => 'fp-el-' . substr( $key, 0, 12 ),
+                'type'       => $section_type,
+                'settings'   => [],
+                'blocks'     => [],
+                'custom_css' => '',
+                'enabled'    => true,
+            ];
+        }
+
+        $data['type'] = $section_type;
+
+        return rest_ensure_response( [ 'sections' => [ $data ] ] );
+    }
+
+    /**
+     * Save FramePress section data for an Elementor widget instance.
+     */
+    public function save_elementor_section( \WP_REST_Request $request ): \WP_REST_Response {
+        $key  = (string) ( $request['key'] ?? '' );
+        $body = $request->get_json_params();
+
+        $post_id    = absint( $body['post_id'] ?? 0 );
+        $sections   = $body['sections'] ?? [];
+        $section_type = sanitize_key( $body['section_type'] ?? '' );
+
+        if ( ! preg_match( '/^[a-f0-9]{32}$/', $key ) || ! $post_id || $section_type === '' ) {
+            return new \WP_REST_Response( [ 'error' => 'Invalid request' ], 400 );
+        }
+
+        if ( ! current_user_can( 'edit_post', $post_id ) ) {
+            return new \WP_REST_Response( [ 'error' => 'Forbidden' ], 403 );
+        }
+
+        if ( ! is_array( $sections ) || empty( $sections[0] ) || ! is_array( $sections[0] ) ) {
+            return new \WP_REST_Response( [ 'error' => 'sections[0] required' ], 400 );
+        }
+
+        $sections[0]['type'] = $section_type;
+        $clean               = $this->sanitize_sections( $sections );
+        $instance            = $clean[0] ?? null;
+
+        if ( ! is_array( $instance ) ) {
+            return new \WP_REST_Response( [ 'error' => 'Invalid section data' ], 400 );
+        }
+
+        update_option( 'framepress_el_' . $key, wp_json_encode( $instance ) );
+
+        return rest_ensure_response( [ 'success' => true, 'sections' => [ $instance ] ] );
     }
 
     public function save_global_settings( \WP_REST_Request $request ): \WP_REST_Response {

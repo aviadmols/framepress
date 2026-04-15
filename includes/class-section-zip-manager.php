@@ -9,7 +9,7 @@
  * - schema.php must return a PHP array (no executable statements caught on load test)
  * - section.php is the only file allowed to contain PHP
  * - The uploads directory has .htaccess blocking direct PHP execution
- * - Only administrators (manage_options) may upload or delete sections
+ * - Upload via REST uses editor_permission; delete remains admin-only on its route
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -68,8 +68,8 @@ class FramePress_Section_Zip_Manager {
         $zip->extractTo( $target );
         $zip->close();
 
-        // Post-extraction: validate that schema.php actually loads as an array.
-        $schema_test = $this->test_schema_file( $target . 'schema.php' );
+        // Post-extraction: validate that schema.php actually loads as an array and type matches slug.
+        $schema_test = $this->test_schema_file( $target . 'schema.php', $slug );
         if ( is_wp_error( $schema_test ) ) {
             $this->delete_directory( $target );
             return $schema_test;
@@ -174,8 +174,12 @@ class FramePress_Section_Zip_Manager {
 
     /**
      * Include schema.php and verify it returns an array with required keys.
+     * When $expected_slug is set, schema['type'] must match (same as install target folder / UI slug).
+     *
+     * @param string $schema_file   Absolute path to schema.php.
+     * @param string $expected_slug Sanitized slug; empty skips type match check.
      */
-    private function test_schema_file( string $schema_file ): true|\WP_Error {
+    private function test_schema_file( string $schema_file, string $expected_slug = '' ): true|\WP_Error {
         if ( ! file_exists( $schema_file ) ) {
             return new \WP_Error( 'schema_missing', __( 'schema.php not found after extraction.', 'framepress' ) );
         }
@@ -195,6 +199,17 @@ class FramePress_Section_Zip_Manager {
             if ( empty( $result[ $key ] ) ) {
                 return new \WP_Error( 'schema_missing_key', sprintf( __( 'schema.php is missing required key: %s', 'framepress' ), $key ) );
             }
+        }
+
+        if ( $expected_slug !== '' && (string) ( $result['type'] ?? '' ) !== $expected_slug ) {
+            return new \WP_Error(
+                'schema_type_mismatch',
+                sprintf(
+                    /* translators: %s: section slug user entered */
+                    __( 'schema.php "type" must be "%s" to match the section slug.', 'framepress' ),
+                    $expected_slug
+                )
+            );
         }
 
         return true;
