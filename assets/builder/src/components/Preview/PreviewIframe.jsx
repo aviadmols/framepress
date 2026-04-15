@@ -25,10 +25,11 @@ export default function PreviewIframe() {
         if ( ! iframeRef.current?.contentWindow ) return;
         iframeRef.current.contentWindow.postMessage( {
             type:           'FRAMEPRESS_UPDATE',
+            context:        state.context,
             sections:       state.sections,
             globalSettings: state.globalSettings,
         }, window.location.origin );
-    }, [ state.sections, state.globalSettings ] );
+    }, [ state.sections, state.globalSettings, state.context ] );
 
     useEffect( () => {
         if ( ! state.previewReady ) return;

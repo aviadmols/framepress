@@ -9,6 +9,11 @@
 
 /* ── Container ───────────────────────────────────────────────────────────── */
 
+
+#wpcontent, #wpfooter {
+    margin-left: 0px !important;
+}
+
 .fp-container {
     max-width: var(--fp-container-width, 1200px);
     margin-left: auto;

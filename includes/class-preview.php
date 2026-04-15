@@ -12,6 +12,13 @@
  * - Nonce validated before any output.
  * - No PHP from POST body — only JSON section data values (rendered by the
  *   normal Section Renderer pipeline which only includes files from disk).
+ *
+ * Live preview bridge:
+ * - Section DOM updates are scoped by builder context (page / header / footer) so
+ *   editing one area does not remove sections elsewhere.
+ * - After each batch update, `framepress:section-mounted` CustomEvent fires per section id
+ *   (detail: { sectionId, root }) so section script.js can re-initialize after DOM replace.
+ * - Set WP_DEBUG to log FRAMEPRESS_UPDATE handling in the browser console.
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -20,6 +27,9 @@ class FramePress_Preview {
 
     private FramePress_Section_Renderer $renderer;
     private FramePress_Global_Settings  $global_settings;
+
+    /** Preview context from query string (page|header|footer|global|…). */
+    private string $preview_context = 'page';
 
     public function __construct(
         FramePress_Section_Renderer $renderer,
@@ -38,31 +48,41 @@ class FramePress_Preview {
         $nonce   = sanitize_text_field( $_GET['nonce'] ?? '' );
         $context = sanitize_text_field( $_GET['context'] ?? 'page' );
 
-        if ( ! $post_id || ! $nonce ) {
+        if ( ! $nonce ) {
             return;
         }
 
-        if ( ! wp_verify_nonce( $nonce, 'framepress_preview_' . $post_id ) ) {
+        $nonce_action = $post_id ? 'framepress_preview_' . $post_id : 'framepress_preview_0';
+        if ( ! wp_verify_nonce( $nonce, $nonce_action ) ) {
             wp_die( esc_html__( 'Preview link has expired. Please return to the builder and try again.', 'framepress' ), 403 );
         }
 
-        if ( ! current_user_can( 'edit_post', $post_id ) ) {
-            wp_die( esc_html__( 'You do not have permission to preview this page.', 'framepress' ), 403 );
-        }
+        $this->preview_context = $context;
 
-        // Override the global query to point at the requested post.
-        global $wp_query;
-        $post = get_post( $post_id );
-        if ( ! $post ) {
-            wp_die( esc_html__( 'Post not found.', 'framepress' ) );
-        }
+        if ( $post_id > 0 ) {
+            if ( ! current_user_can( 'edit_post', $post_id ) ) {
+                wp_die( esc_html__( 'You do not have permission to preview this page.', 'framepress' ), 403 );
+            }
 
-        $wp_query->is_preview        = true;
-        $wp_query->is_singular       = true;
-        $wp_query->is_single         = ( $post->post_type === 'post' );
-        $wp_query->is_page           = ( $post->post_type === 'page' );
-        $wp_query->queried_object    = $post;
-        $wp_query->queried_object_id = $post_id;
+            // Override the global query to point at the requested post.
+            global $wp_query;
+            $post = get_post( $post_id );
+            if ( ! $post ) {
+                wp_die( esc_html__( 'Post not found.', 'framepress' ) );
+            }
+
+            $wp_query->is_preview        = true;
+            $wp_query->is_singular       = true;
+            $wp_query->is_single         = ( $post->post_type === 'post' );
+            $wp_query->is_page           = ( $post->post_type === 'page' );
+            $wp_query->queried_object    = $post;
+            $wp_query->queried_object_id = $post_id;
+        } else {
+            // Header / footer / global preview: no specific post; use the URL target (usually home).
+            if ( ! current_user_can( 'edit_pages' ) ) {
+                wp_die( esc_html__( 'You do not have permission to use the preview.', 'framepress' ), 403 );
+            }
+        }
 
         // Hide the admin bar so it doesn't eat preview space.
         add_filter( 'show_admin_bar', '__return_false' );
@@ -89,11 +109,16 @@ class FramePress_Preview {
     public function output_preview_listener(): void {
         $rest_url = esc_js( rest_url( 'framepress/v1' ) );
         $nonce    = esc_js( wp_create_nonce( 'wp_rest' ) );
+        $ctx      = esc_js( $this->preview_context );
+        $debug    = ( defined( 'WP_DEBUG' ) && WP_DEBUG ) ? 'true' : 'false';
         ?>
         <script id="framepress-preview-bridge">
         (function() {
             var REST_URL = '<?php echo $rest_url; ?>';
             var NONCE    = '<?php echo $nonce; ?>';
+            /** Builder context: only sections inside this scope are updated or removed. */
+            var PREVIEW_CONTEXT = '<?php echo $ctx; ?>';
+            var FRAMEPRESS_PREVIEW_DEBUG = <?php echo $debug; ?>;
 
             /**
              * Swap or insert a section's HTML in the DOM.
@@ -129,7 +154,68 @@ class FramePress_Preview {
                 return c;
             }
 
-            function applySection(sectionId, html) {
+            /**
+             * Root element for live section updates for a builder context.
+             * Page → .framepress-sections-container; header/footer → #framepress-header / #framepress-footer.
+             * Global / ai-settings → null (only global CSS updates, no section DOM sync).
+             *
+             * @param {string} context  From postMessage (preferred) or PREVIEW_CONTEXT from URL.
+             */
+            function getPreviewScopeRootFor(context) {
+                var c = context || PREVIEW_CONTEXT;
+                if (c === 'page') {
+                    return getSectionsContainer();
+                }
+                if (c === 'header') {
+                    var h = document.getElementById('framepress-header');
+                    if (!h) {
+                        h = document.createElement('header');
+                        h.id = 'framepress-header';
+                        h.className = 'framepress-header';
+                        if (document.body.firstChild) {
+                            document.body.insertBefore(h, document.body.firstChild);
+                        } else {
+                            document.body.appendChild(h);
+                        }
+                    }
+                    return h;
+                }
+                if (c === 'footer') {
+                    var f = document.getElementById('framepress-footer');
+                    if (!f) {
+                        f = document.createElement('footer');
+                        f.id = 'framepress-footer';
+                        f.className = 'framepress-footer';
+                        document.body.appendChild(f);
+                    }
+                    return f;
+                }
+                if (c === 'global' || c === 'ai-settings') {
+                    return null;
+                }
+                return getSectionsContainer();
+            }
+
+            function getInsertContainerFor(context) {
+                var root = getPreviewScopeRootFor(context);
+                return root || getSectionsContainer();
+            }
+
+            function dispatchSectionMounted(sectionId) {
+                var el = document.getElementById('framepress-section-' + sectionId);
+                if (!el) return;
+                try {
+                    var ev = new CustomEvent('framepress:section-mounted', {
+                        bubbles: true,
+                        detail: { sectionId: sectionId, root: el }
+                    });
+                    document.dispatchEvent(ev);
+                } catch (e) {
+                    /* IE / very old engines — ignore */
+                }
+            }
+
+            function applySection(sectionId, html, context) {
                 var existing = document.getElementById('framepress-section-' + sectionId);
                 if (existing) {
                     var tmp = document.createElement('div');
@@ -139,8 +225,10 @@ class FramePress_Preview {
                         existing.replaceWith(newNode);
                     }
                 } else {
-                    var container = getSectionsContainer();
-                    container.classList.remove('framepress-sections-container--empty');
+                    var container = getInsertContainerFor(context);
+                    if (container.classList && container.classList.contains('framepress-sections-container')) {
+                        container.classList.remove('framepress-sections-container--empty');
+                    }
                     container.insertAdjacentHTML('beforeend', html);
                 }
             }
@@ -154,17 +242,15 @@ class FramePress_Preview {
             }
 
             /**
-             * Reorder sections in the DOM to match the given ordered id array.
+             * Reorder sections inside the preview scope root.
              */
-            function reorderSections(orderedIds) {
-                var container = null;
-                var first = orderedIds[0] && document.getElementById('framepress-section-' + orderedIds[0]);
-                if (first) container = first.parentElement;
-                if (!container) return;
-
+            function reorderSections(orderedIds, scopeRoot) {
+                if (!scopeRoot) return;
                 orderedIds.forEach(function(id) {
                     var el = document.getElementById('framepress-section-' + id);
-                    if (el) container.appendChild(el);
+                    if (el && scopeRoot.contains(el)) {
+                        scopeRoot.appendChild(el);
+                    }
                 });
             }
 
@@ -264,40 +350,66 @@ class FramePress_Preview {
                 var msg = event.data;
                 if (!msg || msg.type !== 'FRAMEPRESS_UPDATE') return;
 
-                // Update individual sections.
+                var activeContext = (msg.context && String(msg.context)) || PREVIEW_CONTEXT;
+
+                if (FRAMEPRESS_PREVIEW_DEBUG) {
+                    console.log('[FramePress Preview] FRAMEPRESS_UPDATE', activeContext, msg.sections && msg.sections.length, msg.globalSettings ? 'globalSettings' : '');
+                }
+
+                // Global CSS can be updated even when there are no section instances.
+                if (msg.globalSettings) {
+                    applyGlobalSettings(msg.globalSettings);
+                }
+
+                // Only sync section DOM for contexts that edit sections in the iframe.
+                if (activeContext === 'global' || activeContext === 'ai-settings') {
+                    return;
+                }
+
+                var scopeRoot = getPreviewScopeRootFor(activeContext);
+                if (!scopeRoot) {
+                    return;
+                }
+
                 var instances = msg.sections || [];
                 var orderedIds = instances.map(function(s) { return s.id; });
 
-                // Find current rendered sections.
-                var currentSections = document.querySelectorAll('[id^="framepress-section-"]');
+                // Sections currently in this scope only (do not touch header/footer when editing page).
+                var currentSections = scopeRoot.querySelectorAll('[id^="framepress-section-"]');
                 var currentIds = Array.from(currentSections).map(function(el) {
                     return el.id.replace('framepress-section-', '');
                 });
 
-                // Remove sections that were deleted.
+                if (instances.length === 0) {
+                    currentIds.forEach(function(id) {
+                        removeSection(id);
+                    });
+                    if (scopeRoot.classList && scopeRoot.classList.contains('framepress-sections-container')) {
+                        scopeRoot.classList.add('framepress-sections-container--empty');
+                    }
+                    return;
+                }
+
+                // Remove sections that were deleted within this scope.
                 currentIds.forEach(function(id) {
-                    if (!orderedIds.includes(id)) {
+                    if (orderedIds.indexOf(id) === -1) {
                         removeSection(id);
                     }
                 });
 
-                // Render/update each instance, then reorder once all are in the DOM.
                 var pending = instances.length;
-                if (pending === 0) return;
                 instances.forEach(function(instance) {
                     fetchSectionHtml(instance, function(html) {
-                        applySection(instance.id, html);
+                        applySection(instance.id, html, activeContext);
                         pending--;
                         if (pending === 0) {
-                            reorderSections(orderedIds);
+                            reorderSections(orderedIds, scopeRoot);
+                            orderedIds.forEach(function(sid) {
+                                dispatchSectionMounted(sid);
+                            });
                         }
                     });
                 });
-
-                // Apply global settings if provided.
-                if (msg.globalSettings) {
-                    applyGlobalSettings(msg.globalSettings);
-                }
             });
 
             // Signal to the parent editor that the preview is ready.
