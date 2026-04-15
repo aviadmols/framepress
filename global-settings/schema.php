@@ -102,6 +102,19 @@ return [
             ],
         ],
 
+        'integrations' => [
+            'label' => 'Integrations',
+            'settings' => [
+                [
+                    'id'          => 'elementor_widgets_enabled',
+                    'type'        => 'checkbox',
+                    'label'       => 'Enable Elementor Widgets',
+                    'default'     => false,
+                    'description' => 'Register FramePress sections as Elementor widgets.',
+                ],
+            ],
+        ],
+
         'custom_css' => [
             'label' => 'Custom CSS',
             'settings' => [

@@ -2,21 +2,19 @@
 /**
  * FramePress Elementor Integration
  *
- * Registers a "FramePress Section" Elementor widget. Each widget instance is stored
- * in wp_options as framepress_el_{md5(post_id|elementor_element_id)} with JSON
- * instance data (same shape as native FramePress sections).
+ * Registers one Elementor widget per FramePress section type (e.g. fp-hero, fp-faq).
+ * Optional instance data for blocks / legacy JSON is stored in wp_options as
+ * framepress_el_{md5(post_id|elementor_element_id)}.
  *
  * The widget class lives in class-elementor-widget.php and is loaded only from
  * elementor/widgets/register so Elementor\Widget_Base exists (avoids fatals on wp-admin).
  *
- * Editing: open FramePress builder from the widget panel (FramePress → Elementor section).
+ * Enable under FramePress → Global Settings → Integrations → Enable Elementor Widgets.
  */
 
 defined( 'ABSPATH' ) || exit;
 
 class FramePress_Elementor_Integration {
-
-    private const WIDGET_NAME = 'framepress-section';
 
     /** @var bool */
     private static $initialized = false;
@@ -32,7 +30,7 @@ class FramePress_Elementor_Integration {
     }
 
     /**
-     * Custom panel group so the widget appears under "FramePress" in the library.
+     * Custom panel group so widgets appear under "FramePress" in the library.
      *
      * @param mixed $elements_manager \Elementor\Elements_Manager
      */
@@ -61,17 +59,25 @@ class FramePress_Elementor_Integration {
      * @param \Elementor\Widgets_Manager $manager
      */
     public static function register_widget( $manager ): void {
-        if ( ! is_object( $manager ) || ! method_exists( $manager, 'get_widget_types' ) ) {
-            return;
-        }
-
-        // Avoid duplicate registration if hook runs more than once (e.g. Elementor 4 editor flows).
-        $existing = $manager->get_widget_types( self::WIDGET_NAME );
-        if ( null !== $existing ) {
+        if ( ! is_object( $manager ) || ! method_exists( $manager, 'get_widget_types' ) || ! method_exists( $manager, 'register' ) ) {
             return;
         }
 
         require_once FRAMEPRESS_DIR . 'includes/class-elementor-widget.php';
-        $manager->register( new FramePress_Elementor_Widget() );
+
+        $sections = FramePress_Section_Registry::get_instance()->get_all_sections();
+        FramePress_Elementor_Section_Widget::set_schemas( $sections );
+
+        foreach ( $sections as $schema ) {
+            $type = isset( $schema['type'] ) ? sanitize_key( (string) $schema['type'] ) : '';
+            if ( $type === '' ) {
+                continue;
+            }
+            $name = 'fp-' . $type;
+            if ( null !== $manager->get_widget_types( $name ) ) {
+                continue;
+            }
+            $manager->register( new FramePress_Elementor_Section_Widget( [], [ 'fp_section_type' => $type ] ) );
+        }
     }
 }

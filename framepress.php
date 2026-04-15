@@ -173,6 +173,14 @@ function framepress_bootstrap_elementor(): void {
     if ( ! class_exists( '\Elementor\Plugin' ) ) {
         return;
     }
+    $raw = get_option( 'framepress_global_settings', '{}' );
+    $gs  = is_string( $raw ) ? json_decode( $raw, true ) : (array) $raw;
+    if ( ! is_array( $gs ) ) {
+        $gs = [];
+    }
+    if ( empty( $gs['elementor_widgets_enabled'] ) ) {
+        return;
+    }
     require_once FRAMEPRESS_DIR . 'includes/class-elementor-integration.php';
     FramePress_Elementor_Integration::init();
     $done = true;
