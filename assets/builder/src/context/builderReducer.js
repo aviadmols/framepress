@@ -8,6 +8,7 @@ export const initialState = {
     blockSchemas:      [],
     globalSettings:    {},
     globalSchema:      null,
+    globalGoogleFonts: [],
     isDirty:           false,
     isSaving:          false,
     saveError:         null,
@@ -27,7 +28,12 @@ export function builderReducer( state, action ) {
             return { ...state, sections: action.sections, isDirty: false };
 
         case 'LOAD_GLOBAL_SETTINGS':
-            return { ...state, globalSettings: action.settings, globalSchema: action.schema };
+            return {
+                ...state,
+                globalSettings:    action.settings,
+                globalSchema:      action.schema,
+                globalGoogleFonts: action.googleFonts || [],
+            };
 
         case 'SET_CONTEXT':
             return { ...state, context: action.context, postId: action.postId ?? state.postId, selectedSectionId: null, selectedBlockId: null };

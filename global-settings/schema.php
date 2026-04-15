@@ -27,14 +27,20 @@ return [
             'label' => 'Typography',
             'settings' => [
                 [
-                    'id'          => 'google_fonts_url',
-                    'type'        => 'text',
-                    'label'       => 'Google Fonts URL',
+                    'id'          => 'google_font_pick',
+                    'type'        => 'google_font',
+                    'label'       => 'Google Font',
                     'default'     => '',
-                    'description' => 'Paste the CSS embed URL from fonts.google.com — e.g. https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap',
+                    'description' => 'Choose a font — the stylesheet loads automatically. Use “Custom URL” only if you need a manual fonts.googleapis.com link.',
                 ],
-                [ 'id' => 'font_body',        'type' => 'text',   'label' => 'Body Font Family',    'default' => 'sans-serif', 'var' => '--fp-font-body',    'description' => 'Font name to use for body text (must match the Google Font name if using Google Fonts above)' ],
-                [ 'id' => 'font_heading',     'type' => 'text',   'label' => 'Heading Font Family', 'default' => 'sans-serif', 'var' => '--fp-font-heading', 'description' => 'Font name to use for headings (h1–h4)' ],
+                [
+                    'id'          => 'google_fonts_url',
+                    'type'        => 'hidden',
+                    'label'       => '',
+                    'default'     => '',
+                ],
+                [ 'id' => 'font_body',        'type' => 'text',   'label' => 'Body Font Family',    'default' => 'sans-serif', 'var' => '--fp-font-body',    'description' => 'CSS font stack (e.g. Inter, sans-serif). Updated when you pick a Google Font above; you can edit manually.' ],
+                [ 'id' => 'font_heading',     'type' => 'text',   'label' => 'Heading Font Family', 'default' => 'sans-serif', 'var' => '--fp-font-heading', 'description' => 'CSS font stack for headings (h1–h4).' ],
                 [ 'id' => 'font_size_base',   'type' => 'number', 'label' => 'Base Font Size (px)', 'default' => 16,           'var' => '--fp-font-size-base', 'unit' => 'px' ],
                 [ 'id' => 'line_height',      'type' => 'number', 'label' => 'Line Height',         'default' => 1.6,          'var' => '--fp-line-height' ],
                 [

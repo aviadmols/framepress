@@ -13,9 +13,93 @@ class FramePress_Global_Settings {
 
     private const OPTION_KEY   = 'framepress_global_settings';
     private string $schema_file;
+    /** @var list<array{slug:string,label:string,family:string}>|null */
+    private static ?array $google_fonts_catalog = null;
 
     public function __construct() {
         $this->schema_file = FRAMEPRESS_DIR . 'global-settings/schema.php';
+    }
+
+    /**
+     * Curated Google Fonts for the builder dropdown (slug, label, CSS family name).
+     *
+     * @return list<array{slug:string,label:string,family:string}>
+     */
+    public function get_google_fonts_catalog(): array {
+        if ( self::$google_fonts_catalog !== null ) {
+            return self::$google_fonts_catalog;
+        }
+        $file = FRAMEPRESS_DIR . 'global-settings/google-fonts.php';
+        if ( ! is_readable( $file ) ) {
+            self::$google_fonts_catalog = [];
+            return self::$google_fonts_catalog;
+        }
+        /** @var mixed $loaded */
+        $loaded = include $file;
+        self::$google_fonts_catalog = is_array( $loaded ) ? $loaded : [];
+        return self::$google_fonts_catalog;
+    }
+
+    /**
+     * Build Google Fonts CSS v2 URL for a catalog slug.
+     */
+    public function build_google_fonts_css_url_for_slug( string $slug ): string {
+        $slug = sanitize_title( $slug );
+        foreach ( $this->get_google_fonts_catalog() as $font ) {
+            if ( ( $font['slug'] ?? '' ) === $slug ) {
+                $family = (string) ( $font['family'] ?? '' );
+                if ( $family === '' ) {
+                    return '';
+                }
+                $family_q = str_replace( ' ', '+', $family );
+                return 'https://fonts.googleapis.com/css2?family=' . $family_q . ':wght@400;600;700&display=swap';
+            }
+        }
+        return '';
+    }
+
+    /**
+     * @return array{slug:string,label:string,family:string}|null
+     */
+    public function get_google_font_by_slug( string $slug ): ?array {
+        $slug = sanitize_title( $slug );
+        foreach ( $this->get_google_fonts_catalog() as $font ) {
+            if ( ( $font['slug'] ?? '' ) === $slug ) {
+                return $font;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Infer dropdown slug from a saved Google Fonts URL (legacy / custom).
+     */
+    public function infer_google_font_pick( array $settings ): string {
+        $url = trim( (string) ( $settings['google_fonts_url'] ?? '' ) );
+        if ( $url === '' ) {
+            return '';
+        }
+        foreach ( $this->get_google_fonts_catalog() as $font ) {
+            $expected = $this->build_google_fonts_css_url_for_slug( (string) ( $font['slug'] ?? '' ) );
+            if ( $expected !== '' && $expected === $url ) {
+                return (string) $font['slug'];
+            }
+        }
+        $parsed = wp_parse_url( $url );
+        if ( ! empty( $parsed['query'] ) ) {
+            parse_str( (string) $parsed['query'], $q );
+            if ( ! empty( $q['family'] ) ) {
+                $fam = (string) $q['family'];
+                $fam = preg_replace( '/:.*/', '', $fam );
+                $fam = str_replace( '+', ' ', $fam );
+                foreach ( $this->get_google_fonts_catalog() as $font ) {
+                    if ( strcasecmp( (string) ( $font['family'] ?? '' ), $fam ) === 0 ) {
+                        return (string) $font['slug'];
+                    }
+                }
+            }
+        }
+        return '__custom__';
     }
 
     // ─── Public API ───────────────────────────────────────────────────────────
@@ -132,6 +216,9 @@ class FramePress_Global_Settings {
                 $merged[ $id ]  = array_key_exists( $id, $saved ) ? $saved[ $id ] : ( $field['default'] ?? '' );
             }
         }
+        if ( ( $merged['google_font_pick'] ?? '' ) === '' ) {
+            $merged['google_font_pick'] = $this->infer_google_font_pick( $merged );
+        }
         return $merged;
     }
 
@@ -160,6 +247,15 @@ class FramePress_Global_Settings {
                         $allowed      = wp_list_pluck( $field['options'] ?? [], 'value' );
                         $clean[ $id ] = in_array( $value, $allowed, true ) ? $value : ( $field['default'] ?? '' );
                         break;
+                    case 'google_font':
+                        $allowed_slugs = array_map(
+                            static fn( array $f ): string => (string) ( $f['slug'] ?? '' ),
+                            $this->get_google_fonts_catalog()
+                        );
+                        $allowed_slugs = array_merge( [ '', '__custom__' ], $allowed_slugs );
+                        $v             = sanitize_text_field( wp_unslash( (string) $value ) );
+                        $clean[ $id ]  = in_array( $v, $allowed_slugs, true ) ? $v : '';
+                        break;
                     case 'checkbox':
                         $clean[ $id ] = (bool) $value;
                         break;
@@ -167,12 +263,46 @@ class FramePress_Global_Settings {
                         // Custom CSS — strip </style> but otherwise keep raw.
                         $clean[ $id ] = str_ireplace( '</style>', '', wp_unslash( (string) $value ) );
                         break;
+                    case 'hidden':
+                        if ( $id === 'google_fonts_url' ) {
+                            $clean[ $id ] = esc_url_raw( trim( wp_unslash( (string) $value ) ) );
+                        } else {
+                            $clean[ $id ] = sanitize_text_field( wp_unslash( (string) $value ) );
+                        }
+                        break;
                     default:
                         $clean[ $id ] = sanitize_text_field( wp_unslash( (string) $value ) );
                 }
             }
         }
 
+        return $this->sync_google_font_after_sanitize( $clean );
+    }
+
+    /**
+     * Sync google_fonts_url with google_font_pick after sanitise.
+     *
+     * @param array<string,mixed> $clean
+     * @return array<string,mixed>
+     */
+    private function sync_google_font_after_sanitize( array $clean ): array {
+        $pick = (string) ( $clean['google_font_pick'] ?? '' );
+        if ( $pick === '' ) {
+            $clean['google_fonts_url'] = '';
+            return $clean;
+        }
+        if ( $pick === '__custom__' ) {
+            $url = trim( (string) ( $clean['google_fonts_url'] ?? '' ) );
+            if ( $url !== '' && ! preg_match( '#^https://fonts\.googleapis\.com/#', $url ) ) {
+                $clean['google_fonts_url'] = '';
+            } else {
+                $clean['google_fonts_url'] = esc_url_raw( $url );
+            }
+            return $clean;
+        }
+        if ( $this->get_google_font_by_slug( $pick ) ) {
+            $clean['google_fonts_url'] = $this->build_google_fonts_css_url_for_slug( $pick );
+        }
         return $clean;
     }
 }

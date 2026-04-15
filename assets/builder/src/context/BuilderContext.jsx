@@ -24,7 +24,12 @@ export function BuilderProvider( { children } ) {
                     api.getGlobalSettings(),
                 ] );
                 dispatch( { type: 'LOAD_SCHEMAS', schemas: schemasData, blockSchemas: blocksData } );
-                dispatch( { type: 'LOAD_GLOBAL_SETTINGS', settings: globalData.settings, schema: globalData.schema } );
+                dispatch( {
+                    type:        'LOAD_GLOBAL_SETTINGS',
+                    settings:    globalData.settings,
+                    schema:      globalData.schema,
+                    googleFonts: globalData.googleFonts || [],
+                } );
             } catch ( e ) {
                 console.error( '[FramePress] Failed to load schemas', e );
             }

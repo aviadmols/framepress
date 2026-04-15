@@ -8,6 +8,7 @@ import ColorField     from './ColorField';
 import NumberField    from './NumberField';
 import RangeField     from './RangeField';
 import UrlField       from './UrlField';
+import GoogleFontField from './GoogleFontField';
 
 const FIELD_COMPONENTS = {
     text:      TextField,
@@ -22,7 +23,21 @@ const FIELD_COMPONENTS = {
     url:       UrlField,
 };
 
-export default function FieldRenderer( { field, value, onChange } ) {
+export default function FieldRenderer( { field, value, onChange, globalSettings, googleFonts, onGlobalBatchChange } ) {
+    if ( field.hidden || field.type === 'hidden' ) {
+        return null;
+    }
+    if ( field.type === 'google_font' ) {
+        return (
+            <GoogleFontField
+                field={ field }
+                value={ value !== undefined ? value : ( field.default ?? '' ) }
+                globalSettings={ globalSettings }
+                googleFonts={ googleFonts || [] }
+                onBatchChange={ onGlobalBatchChange || ( () => {} ) }
+            />
+        );
+    }
     const Component = FIELD_COMPONENTS[ field.type ];
     if ( ! Component ) {
         return <div className="fp-field fp-field--unknown">Unknown field type: { field.type }</div>;

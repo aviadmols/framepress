@@ -308,8 +308,9 @@ class FramePress_Rest_API {
 
     public function get_global_settings( \WP_REST_Request $request ): \WP_REST_Response {
         return rest_ensure_response( [
-            'settings' => $this->global_settings->get_settings(),
-            'schema'   => $this->global_settings->get_schema(),
+            'settings'    => $this->global_settings->get_settings(),
+            'schema'      => $this->global_settings->get_schema(),
+            'googleFonts' => $this->global_settings->get_google_fonts_catalog(),
         ] );
     }
 
