@@ -361,10 +361,49 @@ class FramePress_Rest_API {
             ], 500 );
         }
 
+        // Resolve asset URLs for the section type so the preview bridge can
+        // inject style.css / script.js into the iframe on live updates.
+        $assets = $this->get_section_asset_urls( $instance['type'] );
+
         return rest_ensure_response( [
             'html'       => $html,
             'section_id' => $instance['id'] ?? '',
+            'assets'     => $assets,
         ] );
+    }
+
+    /**
+     * Resolve the public URLs for a section type's style.css and script.js.
+     * Returns an array with 'style_url' and 'script_url' (null if file absent).
+     */
+    private function get_section_asset_urls( string $type ): array {
+        $schema = $this->section_registry->get_section( $type );
+        if ( ! $schema ) {
+            return [ 'style_url' => null, 'script_url' => null ];
+        }
+
+        $path   = trailingslashit( $schema['_path'] );
+        $source = $schema['_source'] ?? 'plugin';
+
+        // Convert filesystem path → public URL (mirrors FramePress_Section_Assets logic).
+        $base_url = match ( $source ) {
+            'theme'   => str_replace(
+                trailingslashit( get_stylesheet_directory() ),
+                trailingslashit( get_stylesheet_directory_uri() ),
+                $path
+            ),
+            'uploads' => str_replace(
+                trailingslashit( wp_upload_dir()['basedir'] ),
+                trailingslashit( wp_upload_dir()['baseurl'] ),
+                $path
+            ),
+            default   => str_replace( FRAMEPRESS_DIR, FRAMEPRESS_URL, $path ),
+        };
+
+        return [
+            'style_url'  => file_exists( $path . 'style.css'  ) ? $base_url . 'style.css?v='  . filemtime( $path . 'style.css'  ) : null,
+            'script_url' => file_exists( $path . 'script.js'  ) ? $base_url . 'script.js?v='  . filemtime( $path . 'script.js'  ) : null,
+        ];
     }
 
     // ─── ZIP upload ───────────────────────────────────────────────────────────
@@ -498,19 +537,26 @@ class FramePress_Rest_API {
         $mode = sanitize_key( $body['mode'] ?? 'description' ); // 'description' | 'html'
         $ai   = new FramePress_AI_Service();
 
+        // Sanitise image: accept data URI only, strip anything unsafe.
+        $image_data = '';
+        $raw_image  = $body['image_data'] ?? '';
+        if ( is_string( $raw_image ) && preg_match( '/^data:image\/(png|jpe?g|gif|webp|svg\+xml);base64,[A-Za-z0-9+\/=]+$/', $raw_image ) ) {
+            $image_data = $raw_image;
+        }
+
         if ( $mode === 'html' ) {
             $html   = wp_kses_post( $body['html'] ?? '' );
             $slug   = sanitize_title( $body['slug'] ?? '' );
             if ( empty( $html ) ) {
                 return new \WP_REST_Response( [ 'error' => 'html is required' ], 400 );
             }
-            $result = $ai->generate_section_from_html( $html, $slug );
+            $result = $ai->generate_section_from_html( $html, $slug, $image_data );
         } else {
             $description = sanitize_textarea_field( $body['description'] ?? '' );
             if ( empty( $description ) ) {
                 return new \WP_REST_Response( [ 'error' => 'description is required' ], 400 );
             }
-            $result = $ai->generate_section_from_description( $description );
+            $result = $ai->generate_section_from_description( $description, $image_data );
         }
 
         if ( is_wp_error( $result ) ) {

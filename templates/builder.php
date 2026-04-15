@@ -17,7 +17,7 @@ defined( 'ABSPATH' ) || exit;
     <meta charset="<?php bloginfo( 'charset' ); ?>">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php esc_html_e( 'FramePress Builder', 'framepress' ); ?> — <?php bloginfo( 'name' ); ?></title>
-    <?php wp_head(); ?>
+    <?php wp_enqueue_media(); wp_head(); ?>
     <style>
         /* Reset admin body styles so the builder fills the viewport cleanly */
         html, body {
@@ -32,7 +32,11 @@ defined( 'ABSPATH' ) || exit;
         #wpfooter {
             display: none !important;
         }
+        #wpcontent, #wpfooter {
+            margin-left: 0 !important;
+        }
         #framepress-builder-root {
+            
             width: 100vw;
             height: 100vh;
             overflow: hidden;

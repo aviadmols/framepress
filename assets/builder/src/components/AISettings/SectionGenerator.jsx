@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 
 const REST   = () => window.framepressData?.restUrl || '';
 const NONCE  = () => window.framepressData?.nonce   || '';
@@ -32,6 +32,20 @@ export default function SectionGenerator() {
     const [ prompt,       setPrompt       ] = useState( '' );
     const [ promptLoading, setPromptLoading ] = useState( false );
     const [ copied,       setCopied       ] = useState( false );
+    const [ imageData,    setImageData    ] = useState( '' );   // base64 data URI
+    const [ imageName,    setImageName    ] = useState( '' );
+    const imageInputRef = useRef( null );
+
+    function handleImageFile( e ) {
+        const file = e.target.files?.[0];
+        if ( ! file ) return;
+        const reader = new FileReader();
+        reader.onload = ev => {
+            setImageData( ev.target.result );
+            setImageName( file.name );
+        };
+        reader.readAsDataURL( file );
+    }
 
     async function generate() {
         setLoading( true );
@@ -41,8 +55,8 @@ export default function SectionGenerator() {
         setInstallError( '' );
 
         const body = mode === 'html'
-            ? { mode: 'html', html, slug }
-            : { mode: 'description', description };
+            ? { mode: 'html', html, slug, image_data: imageData || undefined }
+            : { mode: 'description', description, image_data: imageData || undefined };
 
         try {
             const res  = await fetch( REST() + '/ai/generate-section-files', {
@@ -181,6 +195,36 @@ export default function SectionGenerator() {
                         />
                     </>
                 ) }
+
+                {/* Image attachment */}
+                <div className="fp-sg__image-row">
+                    <input
+                        ref={ imageInputRef }
+                        type="file"
+                        accept="image/*"
+                        style={ { display: 'none' } }
+                        onChange={ handleImageFile }
+                    />
+                    { imageData ? (
+                        <div className="fp-sg__image-preview">
+                            <img src={ imageData } alt="" className="fp-sg__image-thumb" />
+                            <span className="fp-sg__image-name">{ imageName }</span>
+                            <button
+                                type="button"
+                                className="fp-sg__image-remove"
+                                onClick={ () => { setImageData( '' ); setImageName( '' ); } }
+                            >✕</button>
+                        </div>
+                    ) : (
+                        <button
+                            type="button"
+                            className="fp-sg__image-btn"
+                            onClick={ () => imageInputRef.current?.click() }
+                        >
+                            📎 Attach reference image (optional)
+                        </button>
+                    ) }
+                </div>
 
                 <button
                     className="fp-sg__generate-btn"

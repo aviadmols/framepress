@@ -96,18 +96,40 @@ class FramePress_AI_Service {
 
     // ─── API abstraction ──────────────────────────────────────────────────────
 
-    private function call_api( string $system_prompt, string $user_message ): array|\WP_Error {
+    /**
+     * @param string      $system_prompt
+     * @param string      $user_message
+     * @param string|null $image_base64  Optional base64-encoded image (data URI or raw base64).
+     * @param string      $image_mime    MIME type, e.g. 'image/png'
+     */
+    private function call_api( string $system_prompt, string $user_message, ?string $image_base64 = null, string $image_mime = 'image/png' ): array|\WP_Error {
         switch ( $this->provider ) {
             case 'anthropic':
-                return $this->call_anthropic( $system_prompt, $user_message );
+                return $this->call_anthropic( $system_prompt, $user_message, $image_base64, $image_mime );
             case 'openai':
-                return $this->call_openai( $system_prompt, $user_message );
+                return $this->call_openai( $system_prompt, $user_message, $image_base64, $image_mime );
             default:
                 return new \WP_Error( 'unknown_provider', sprintf( __( 'Unknown AI provider: %s', 'framepress' ), $this->provider ) );
         }
     }
 
-    private function call_anthropic( string $system_prompt, string $user_message ): array|\WP_Error {
+    private function call_anthropic( string $system_prompt, string $user_message, ?string $image_base64 = null, string $image_mime = 'image/png' ): array|\WP_Error {
+        // Build content array — optionally prepend an image block.
+        $content = [];
+        if ( $image_base64 ) {
+            // Strip data URI prefix if present.
+            $raw = preg_replace( '/^data:[^;]+;base64,/', '', $image_base64 );
+            $content[] = [
+                'type'   => 'image',
+                'source' => [
+                    'type'       => 'base64',
+                    'media_type' => $image_mime,
+                    'data'       => $raw,
+                ],
+            ];
+        }
+        $content[] = [ 'type' => 'text', 'text' => $user_message ];
+
         $response = wp_remote_post( 'https://api.anthropic.com/v1/messages', [
             'timeout' => 120,
             'headers' => [
@@ -120,7 +142,7 @@ class FramePress_AI_Service {
                 'max_tokens' => 2048,
                 'system'     => $system_prompt,
                 'messages'   => [
-                    [ 'role' => 'user', 'content' => $user_message ],
+                    [ 'role' => 'user', 'content' => $content ],
                 ],
             ] ),
         ] );
@@ -128,7 +150,18 @@ class FramePress_AI_Service {
         return $this->parse_anthropic_response( $response );
     }
 
-    private function call_openai( string $system_prompt, string $user_message ): array|\WP_Error {
+    private function call_openai( string $system_prompt, string $user_message, ?string $image_base64 = null, string $image_mime = 'image/png' ): array|\WP_Error {
+        // Build user content array — optionally include an image.
+        if ( $image_base64 ) {
+            $raw = preg_replace( '/^data:[^;]+;base64,/', '', $image_base64 );
+            $user_content = [
+                [ 'type' => 'text',       'text'      => $user_message ],
+                [ 'type' => 'image_url',  'image_url' => [ 'url' => 'data:' . $image_mime . ';base64,' . $raw ] ],
+            ];
+        } else {
+            $user_content = $user_message;
+        }
+
         $response = wp_remote_post( 'https://api.openai.com/v1/chat/completions', [
             'timeout' => 120,
             'headers' => [
@@ -139,7 +172,7 @@ class FramePress_AI_Service {
                 'model'    => $this->model ?: 'gpt-4o',
                 'messages' => [
                     [ 'role' => 'system', 'content' => $system_prompt ],
-                    [ 'role' => 'user',   'content' => $user_message ],
+                    [ 'role' => 'user',   'content' => $user_content ],
                 ],
                 'response_format' => [ 'type' => 'json_object' ],
             ] ),
@@ -262,7 +295,7 @@ class FramePress_AI_Service {
      * @param string $description  What the section should do/look like.
      * @return array|\WP_Error     { slug, label, schema_php, section_php, style_css }
      */
-    public function generate_section_from_description( string $description ): array|\WP_Error {
+    public function generate_section_from_description( string $description, string $image_data = '' ): array|\WP_Error {
         if ( ! $this->is_available() ) {
             return new \WP_Error( 'ai_disabled', __( 'AI is not configured.', 'framepress' ) );
         }
@@ -270,10 +303,14 @@ class FramePress_AI_Service {
         if ( is_wp_error( $rate_error ) ) return $rate_error;
 
         $system = $this->build_section_files_system_prompt();
-        $user   = "Create a FramePress section for: {$description}\n\n"
-                . "Return ONLY valid JSON with keys: slug, label, schema_php, section_php, style_css.";
+        $user   = "Create a FramePress section for: {$description}";
+        if ( $image_data ) {
+            $user .= "\n\nA reference image is attached — use it to match the visual design.";
+        }
+        $user .= "\n\nReturn ONLY valid JSON with keys: slug, label, schema_php, section_php, style_css.";
 
-        $result = $this->call_api( $system, $user );
+        $mime = $this->detect_image_mime( $image_data );
+        $result = $this->call_api( $system, $user, $image_data ?: null, $mime );
         if ( is_wp_error( $result ) ) return $result;
 
         return $this->validate_section_files_response( $result );
@@ -286,7 +323,7 @@ class FramePress_AI_Service {
      * @param string $slug   Optional suggested slug (user-supplied).
      * @return array|\WP_Error  { slug, label, schema_php, section_php, style_css }
      */
-    public function generate_section_from_html( string $html, string $slug = '' ): array|\WP_Error {
+    public function generate_section_from_html( string $html, string $slug = '', string $image_data = '' ): array|\WP_Error {
         if ( ! $this->is_available() ) {
             return new \WP_Error( 'ai_disabled', __( 'AI is not configured.', 'framepress' ) );
         }
@@ -299,10 +336,14 @@ class FramePress_AI_Service {
               . $slug_hint
               . "HTML:\n```html\n{$html}\n```\n\n"
               . "Identify all variable parts (text, images, colours, links) and turn them into schema settings. "
-              . "Hard-code structural HTML; parameterise content.\n\n"
-              . "Return ONLY valid JSON with keys: slug, label, schema_php, section_php, style_css.";
+              . "Hard-code structural HTML; parameterise content.";
+        if ( $image_data ) {
+            $user .= "\n\nA reference image is attached — use it to understand the visual design.";
+        }
+        $user .= "\n\nReturn ONLY valid JSON with keys: slug, label, schema_php, section_php, style_css.";
 
-        $result = $this->call_api( $system, $user );
+        $mime   = $this->detect_image_mime( $image_data );
+        $result = $this->call_api( $system, $user, $image_data ?: null, $mime );
         if ( is_wp_error( $result ) ) return $result;
 
         return $this->validate_section_files_response( $result );
@@ -671,6 +712,16 @@ PROMPT;
         $iv  = openssl_random_pseudo_bytes( 16 );
         $enc = openssl_encrypt( $plain, 'AES-256-CBC', $key, 0, $iv );
         return base64_encode( $iv . '::' . $enc );
+    }
+
+    /**
+     * Detect MIME type from a base64 data URI or raw base64 string.
+     */
+    private function detect_image_mime( string $image_data ): string {
+        if ( preg_match( '/^data:([^;]+);base64,/', $image_data, $m ) ) {
+            return $m[1];
+        }
+        return 'image/png'; // safe default
     }
 
     private function decrypt_api_key( string $stored ): string {

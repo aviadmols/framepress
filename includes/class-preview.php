@@ -168,6 +168,44 @@ class FramePress_Preview {
                 });
             }
 
+            // Track which section asset URLs have already been injected by the bridge.
+            var injectedAssets = new Set();
+
+            /**
+             * Inject a <link> or <script> tag once per URL.
+             * Also checks if the asset is already present in the DOM (loaded on initial
+             * page load by WP's enqueue system) to prevent double-execution of scripts.
+             */
+            function injectAsset(url, type) {
+                if (!url) return;
+                // Strip query-string for DOM presence check (WP may use ?ver= while REST uses ?v=).
+                var urlBase = url.split('?')[0];
+                if (type === 'style') {
+                    if (injectedAssets.has(urlBase)) return;
+                    // Don't inject if a link with the same base URL is already in the DOM.
+                    if (document.querySelector('link[rel="stylesheet"][href^="' + urlBase + '"]')) {
+                        injectedAssets.add(urlBase);
+                        return;
+                    }
+                    injectedAssets.add(urlBase);
+                    var link = document.createElement('link');
+                    link.rel  = 'stylesheet';
+                    link.href = url;
+                    document.head.appendChild(link);
+                } else {
+                    if (injectedAssets.has(urlBase)) return;
+                    // Don't re-inject a script already present — would cause double-execution.
+                    if (document.querySelector('script[src^="' + urlBase + '"]')) {
+                        injectedAssets.add(urlBase);
+                        return;
+                    }
+                    injectedAssets.add(urlBase);
+                    var script = document.createElement('script');
+                    script.src = url;
+                    document.body.appendChild(script);
+                }
+            }
+
             /**
              * Fetch rendered HTML for a section instance from the PHP renderer.
              */
@@ -182,6 +220,11 @@ class FramePress_Preview {
                 })
                 .then(function(r) { return r.json(); })
                 .then(function(data) {
+                    // Inject section CSS / JS if returned and not yet loaded.
+                    if (data.assets) {
+                        injectAsset(data.assets.style_url,  'style');
+                        injectAsset(data.assets.script_url, 'script');
+                    }
                     if (data.html !== undefined) callback(data.html);
                 })
                 .catch(function(e) { console.error('[FramePress Preview] render error', e); });
