@@ -1,8 +1,8 @@
 <?php
 /**
- * FramePress Preview
+ * HERO Preview
  *
- * Handles the live preview endpoint: /?framepress_preview=1&post_id=X&nonce=Y
+ * Handles the live preview endpoint: /?hero_preview=1&post_id=X&nonce=Y
  *
  * Renders a real WordPress frontend page (with actual theme, header, footer)
  * but substitutes the page's section data with the draft state supplied via
@@ -16,24 +16,24 @@
  * Live preview bridge:
  * - Section DOM updates are scoped by builder context (page / header / footer) so
  *   editing one area does not remove sections elsewhere.
- * - After each batch update, `framepress:section-mounted` CustomEvent fires per section id
+ * - After each batch update, `hero:section-mounted` CustomEvent fires per section id
  *   (detail: { sectionId, root }) so section script.js can re-initialize after DOM replace.
- * - Set WP_DEBUG to log FRAMEPRESS_UPDATE handling in the browser console.
+ * - Set WP_DEBUG to log HERO_UPDATE handling in the browser console.
  */
 
 defined( 'ABSPATH' ) || exit;
 
-class FramePress_Preview {
+class Hero_Preview {
 
-    private FramePress_Section_Renderer $renderer;
-    private FramePress_Global_Settings  $global_settings;
+    private Hero_Section_Renderer $renderer;
+    private Hero_Global_Settings  $global_settings;
 
     /** Preview context from query string (page|header|footer|global|…). */
     private string $preview_context = 'page';
 
     public function __construct(
-        FramePress_Section_Renderer $renderer,
-        FramePress_Global_Settings  $global_settings
+        Hero_Section_Renderer $renderer,
+        Hero_Global_Settings  $global_settings
     ) {
         $this->renderer        = $renderer;
         $this->global_settings = $global_settings;
@@ -52,23 +52,23 @@ class FramePress_Preview {
             return;
         }
 
-        $nonce_action = $post_id ? 'framepress_preview_' . $post_id : 'framepress_preview_0';
+        $nonce_action = $post_id ? 'hero_preview_' . $post_id : 'hero_preview_0';
         if ( ! wp_verify_nonce( $nonce, $nonce_action ) ) {
-            wp_die( esc_html__( 'Preview link has expired. Please return to the builder and try again.', 'framepress' ), 403 );
+            wp_die( esc_html__( 'Preview link has expired. Please return to the builder and try again.', 'hero' ), 403 );
         }
 
         $this->preview_context = $context;
 
         if ( $post_id > 0 ) {
             if ( ! current_user_can( 'edit_post', $post_id ) ) {
-                wp_die( esc_html__( 'You do not have permission to preview this page.', 'framepress' ), 403 );
+                wp_die( esc_html__( 'You do not have permission to preview this page.', 'hero' ), 403 );
             }
 
             // Override the global query to point at the requested post.
             global $wp_query;
             $post = get_post( $post_id );
             if ( ! $post ) {
-                wp_die( esc_html__( 'Post not found.', 'framepress' ) );
+                wp_die( esc_html__( 'Post not found.', 'hero' ) );
             }
 
             $wp_query->is_preview        = true;
@@ -80,7 +80,7 @@ class FramePress_Preview {
         } else {
             // Header / footer / global preview: no specific post; use the URL target (usually home).
             if ( ! current_user_can( 'edit_pages' ) ) {
-                wp_die( esc_html__( 'You do not have permission to use the preview.', 'framepress' ), 403 );
+                wp_die( esc_html__( 'You do not have permission to use the preview.', 'hero' ), 403 );
             }
         }
 
@@ -95,7 +95,7 @@ class FramePress_Preview {
         add_action( 'wp_footer', [ $this, 'output_preview_listener' ], 99 );
 
         // Mark this as a preview request so the renderer can skip caching.
-        add_filter( 'framepress_is_preview', '__return_true' );
+        add_filter( 'hero_is_preview', '__return_true' );
 
         // Proceed with the normal WordPress template loading.
         // The renderer's the_content filter is already hooked — it will
@@ -107,39 +107,39 @@ class FramePress_Preview {
      * This script receives live updates from the builder editor iframe parent.
      */
     public function output_preview_listener(): void {
-        $rest_url = esc_js( rest_url( 'framepress/v1' ) );
+        $rest_url = esc_js( rest_url( 'hero/v1' ) );
         $nonce    = esc_js( wp_create_nonce( 'wp_rest' ) );
         $ctx      = esc_js( $this->preview_context );
         $debug    = ( defined( 'WP_DEBUG' ) && WP_DEBUG ) ? 'true' : 'false';
         ?>
-        <script id="framepress-preview-bridge">
+        <script id="hero-preview-bridge">
         (function() {
             var REST_URL = '<?php echo $rest_url; ?>';
             var NONCE    = '<?php echo $nonce; ?>';
             /** Builder context: only sections inside this scope are updated or removed. */
             var PREVIEW_CONTEXT = '<?php echo $ctx; ?>';
-            var FRAMEPRESS_PREVIEW_DEBUG = <?php echo $debug; ?>;
+            var HERO_PREVIEW_DEBUG = <?php echo $debug; ?>;
 
             /**
              * Swap or insert a section's HTML in the DOM.
              */
             /**
-             * Return (or create) the FramePress sections container.
+             * Return (or create) the HERO sections container.
              *
              * Priority:
-             *  1. Already-injected .framepress-sections-container  (via the_content filter)
+             *  1. Already-injected .hero-sections-container  (via the_content filter)
              *  2. Create a new one and inject it before the page footer
              *
              * This makes the preview work even when Elementor or the active theme
              * bypasses the WordPress the_content filter entirely.
              */
             function getSectionsContainer() {
-                var c = document.querySelector('.framepress-sections-container');
+                var c = document.querySelector('.hero-sections-container');
                 if (c) return c;
 
                 // Create a fresh container and inject it at a sensible location.
                 c = document.createElement('div');
-                c.className = 'framepress-sections-container';
+                c.className = 'hero-sections-container';
                 c.style.cssText = 'position:relative;z-index:1;';
 
                 // Try to inject before site footer; fall back to end of body.
@@ -156,7 +156,7 @@ class FramePress_Preview {
 
             /**
              * Root element for live section updates for a builder context.
-             * Page → .framepress-sections-container; header/footer → #framepress-header / #framepress-footer.
+             * Page → .hero-sections-container; header/footer → #hero-header / #hero-footer.
              * Global / ai-settings → null (only global CSS updates, no section DOM sync).
              *
              * @param {string} context  From postMessage (preferred) or PREVIEW_CONTEXT from URL.
@@ -167,11 +167,11 @@ class FramePress_Preview {
                     return getSectionsContainer();
                 }
                 if (c === 'header') {
-                    var h = document.getElementById('framepress-header');
+                    var h = document.getElementById('hero-header');
                     if (!h) {
                         h = document.createElement('header');
-                        h.id = 'framepress-header';
-                        h.className = 'framepress-header';
+                        h.id = 'hero-header';
+                        h.className = 'hero-header';
                         if (document.body.firstChild) {
                             document.body.insertBefore(h, document.body.firstChild);
                         } else {
@@ -181,11 +181,11 @@ class FramePress_Preview {
                     return h;
                 }
                 if (c === 'footer') {
-                    var f = document.getElementById('framepress-footer');
+                    var f = document.getElementById('hero-footer');
                     if (!f) {
                         f = document.createElement('footer');
-                        f.id = 'framepress-footer';
-                        f.className = 'framepress-footer';
+                        f.id = 'hero-footer';
+                        f.className = 'hero-footer';
                         document.body.appendChild(f);
                     }
                     return f;
@@ -202,10 +202,10 @@ class FramePress_Preview {
             }
 
             function dispatchSectionMounted(sectionId) {
-                var el = document.getElementById('framepress-section-' + sectionId);
+                var el = document.getElementById('hero-section-' + sectionId);
                 if (!el) return;
                 try {
-                    var ev = new CustomEvent('framepress:section-mounted', {
+                    var ev = new CustomEvent('hero:section-mounted', {
                         bubbles: true,
                         detail: { sectionId: sectionId, root: el }
                     });
@@ -216,7 +216,7 @@ class FramePress_Preview {
             }
 
             function applySection(sectionId, html, context) {
-                var existing = document.getElementById('framepress-section-' + sectionId);
+                var existing = document.getElementById('hero-section-' + sectionId);
                 if (existing) {
                     var tmp = document.createElement('div');
                     tmp.innerHTML = html;
@@ -226,8 +226,8 @@ class FramePress_Preview {
                     }
                 } else {
                     var container = getInsertContainerFor(context);
-                    if (container.classList && container.classList.contains('framepress-sections-container')) {
-                        container.classList.remove('framepress-sections-container--empty');
+                    if (container.classList && container.classList.contains('hero-sections-container')) {
+                        container.classList.remove('hero-sections-container--empty');
                     }
                     container.insertAdjacentHTML('beforeend', html);
                 }
@@ -237,7 +237,7 @@ class FramePress_Preview {
              * Remove a section from the DOM.
              */
             function removeSection(sectionId) {
-                var el = document.getElementById('framepress-section-' + sectionId);
+                var el = document.getElementById('hero-section-' + sectionId);
                 if (el) el.remove();
             }
 
@@ -247,7 +247,7 @@ class FramePress_Preview {
             function reorderSections(orderedIds, scopeRoot) {
                 if (!scopeRoot) return;
                 orderedIds.forEach(function(id) {
-                    var el = document.getElementById('framepress-section-' + id);
+                    var el = document.getElementById('hero-section-' + id);
                     if (el && scopeRoot.contains(el)) {
                         scopeRoot.appendChild(el);
                     }
@@ -313,7 +313,7 @@ class FramePress_Preview {
                     }
                     if (data.html !== undefined) callback(data.html);
                 })
-                .catch(function(e) { console.error('[FramePress Preview] render error', e); });
+                .catch(function(e) { console.error('[HERO Preview] render error', e); });
             }
 
             /**
@@ -331,10 +331,10 @@ class FramePress_Preview {
                 .then(function(r) { return r.json(); })
                 .then(function(data) {
                     if (!data.css) return;
-                    var style = document.getElementById('framepress-live-global');
+                    var style = document.getElementById('hero-live-global');
                     if (!style) {
                         style = document.createElement('style');
-                        style.id = 'framepress-live-global';
+                        style.id = 'hero-live-global';
                         document.head.appendChild(style);
                     }
                     style.textContent = data.css;
@@ -348,12 +348,12 @@ class FramePress_Preview {
                 if (event.origin !== window.location.origin) return;
 
                 var msg = event.data;
-                if (!msg || msg.type !== 'FRAMEPRESS_UPDATE') return;
+                if (!msg || msg.type !== 'HERO_UPDATE') return;
 
                 var activeContext = (msg.context && String(msg.context)) || PREVIEW_CONTEXT;
 
-                if (FRAMEPRESS_PREVIEW_DEBUG) {
-                    console.log('[FramePress Preview] FRAMEPRESS_UPDATE', activeContext, msg.sections && msg.sections.length, msg.globalSettings ? 'globalSettings' : '');
+                if (HERO_PREVIEW_DEBUG) {
+                    console.log('[HERO Preview] HERO_UPDATE', activeContext, msg.sections && msg.sections.length, msg.globalSettings ? 'globalSettings' : '');
                 }
 
                 // Global CSS can be updated even when there are no section instances.
@@ -375,17 +375,17 @@ class FramePress_Preview {
                 var orderedIds = instances.map(function(s) { return s.id; });
 
                 // Sections currently in this scope only (do not touch header/footer when editing page).
-                var currentSections = scopeRoot.querySelectorAll('[id^="framepress-section-"]');
+                var currentSections = scopeRoot.querySelectorAll('[id^="hero-section-"]');
                 var currentIds = Array.from(currentSections).map(function(el) {
-                    return el.id.replace('framepress-section-', '');
+                    return el.id.replace('hero-section-', '');
                 });
 
                 if (instances.length === 0) {
                     currentIds.forEach(function(id) {
                         removeSection(id);
                     });
-                    if (scopeRoot.classList && scopeRoot.classList.contains('framepress-sections-container')) {
-                        scopeRoot.classList.add('framepress-sections-container--empty');
+                    if (scopeRoot.classList && scopeRoot.classList.contains('hero-sections-container')) {
+                        scopeRoot.classList.add('hero-sections-container--empty');
                     }
                     return;
                 }
@@ -413,7 +413,7 @@ class FramePress_Preview {
             });
 
             // Signal to the parent editor that the preview is ready.
-            window.parent.postMessage({ type: 'FRAMEPRESS_PREVIEW_READY' }, window.location.origin);
+            window.parent.postMessage({ type: 'HERO_PREVIEW_READY' }, window.location.origin);
         })();
         </script>
         <?php

@@ -7,7 +7,7 @@ export default function CustomCssEditor( { section } ) {
         <div className="fp-custom-css-editor">
             <p className="fp-custom-css-editor__hint">
                 CSS entered here is scoped to{' '}
-                <code>#framepress-section-{ section.id }</code> automatically.
+                <code>#hero-section-{ section.id }</code> automatically.
             </p>
             <textarea
                 className="fp-custom-css-editor__textarea"

@@ -1,9 +1,9 @@
 <?php
 /**
- * FramePress Section ZIP Manager
+ * HERO Section ZIP Manager
  *
  * Handles lifecycle of user-uploaded custom sections stored in
- * wp-content/uploads/framepress/sections/{slug}/
+ * wp-content/uploads/hero/sections/{slug}/
  *
  * Security rules:
  * - schema.php must return a PHP array (no executable statements caught on load test)
@@ -14,15 +14,15 @@
 
 defined( 'ABSPATH' ) || exit;
 
-class FramePress_Section_Zip_Manager {
+class Hero_Section_Zip_Manager {
 
     private string $base_dir;
     private string $base_url;
 
     public function __construct() {
         $upload         = wp_upload_dir();
-        $this->base_dir = trailingslashit( $upload['basedir'] ) . 'framepress/sections/';
-        $this->base_url = trailingslashit( $upload['baseurl'] ) . 'framepress/sections/';
+        $this->base_dir = trailingslashit( $upload['basedir'] ) . 'hero/sections/';
+        $this->base_url = trailingslashit( $upload['baseurl'] ) . 'hero/sections/';
     }
 
     // ─── Upload ───────────────────────────────────────────────────────────────
@@ -37,17 +37,17 @@ class FramePress_Section_Zip_Manager {
     public function install_from_zip( string $tmp_file, string $slug ): true|\WP_Error {
         $slug = sanitize_title( $slug );
         if ( ! $slug ) {
-            return new \WP_Error( 'invalid_slug', __( 'Invalid section slug.', 'framepress' ) );
+            return new \WP_Error( 'invalid_slug', __( 'Invalid section slug.', 'hero' ) );
         }
 
         if ( ! class_exists( 'ZipArchive' ) ) {
-            return new \WP_Error( 'no_zip', __( 'ZipArchive PHP extension is required.', 'framepress' ) );
+            return new \WP_Error( 'no_zip', __( 'ZipArchive PHP extension is required.', 'hero' ) );
         }
 
         $zip = new \ZipArchive();
         $res = $zip->open( $tmp_file );
         if ( $res !== true ) {
-            return new \WP_Error( 'zip_open', __( 'Could not open ZIP file.', 'framepress' ) );
+            return new \WP_Error( 'zip_open', __( 'Could not open ZIP file.', 'hero' ) );
         }
 
         // Validate contents before extraction.
@@ -75,8 +75,15 @@ class FramePress_Section_Zip_Manager {
             return $schema_test;
         }
 
+        // Import any image files from the ZIP into WordPress Media Library (non-fatal).
+        $zip2 = new \ZipArchive();
+        if ( $zip2->open( $tmp_file ) === true ) {
+            $this->import_images_from_zip( $zip2 );
+            $zip2->close();
+        }
+
         // Bust registry cache so the new section appears immediately.
-        FramePress_Section_Registry::get_instance()->bust_cache();
+        Hero_Section_Registry::get_instance()->bust_cache();
 
         return true;
     }
@@ -91,15 +98,15 @@ class FramePress_Section_Zip_Manager {
      * @return true|\WP_Error
      */
     public function delete_section( string $type, bool $force_delete = false ): true|\WP_Error {
-        $registry = FramePress_Section_Registry::get_instance();
+        $registry = Hero_Section_Registry::get_instance();
         $schema   = $registry->get_section( $type );
 
         if ( ! $schema ) {
-            return new \WP_Error( 'not_found', __( 'Section not found.', 'framepress' ) );
+            return new \WP_Error( 'not_found', __( 'Section not found.', 'hero' ) );
         }
 
         if ( ( $schema['_source'] ?? '' ) !== 'uploads' ) {
-            return new \WP_Error( 'not_uploaded', __( 'Only uploaded sections can be deleted via this manager.', 'framepress' ) );
+            return new \WP_Error( 'not_uploaded', __( 'Only uploaded sections can be deleted via this manager.', 'hero' ) );
         }
 
         if ( ! $force_delete ) {
@@ -108,7 +115,7 @@ class FramePress_Section_Zip_Manager {
                 return new \WP_Error(
                     'section_in_use',
                     sprintf(
-                        __( 'Section "%s" is used on %d page(s). Use force_delete to override.', 'framepress' ),
+                        __( 'Section "%s" is used on %d page(s). Use force_delete to override.', 'hero' ),
                         $type,
                         count( $in_use )
                     ),
@@ -119,7 +126,7 @@ class FramePress_Section_Zip_Manager {
 
         $target = $this->base_dir . $type . '/';
         if ( ! is_dir( $target ) ) {
-            return new \WP_Error( 'dir_not_found', __( 'Section directory not found.', 'framepress' ) );
+            return new \WP_Error( 'dir_not_found', __( 'Section directory not found.', 'hero' ) );
         }
 
         $this->delete_directory( $target );
@@ -156,17 +163,17 @@ class FramePress_Section_Zip_Manager {
                 if ( $basename !== 'section.php' && $basename !== 'schema.php' ) {
                     return new \WP_Error(
                         'disallowed_php',
-                        sprintf( __( 'ZIP contains disallowed PHP file: %s', 'framepress' ), esc_html( $name ) )
+                        sprintf( __( 'ZIP contains disallowed PHP file: %s', 'hero' ), esc_html( $name ) )
                     );
                 }
             }
         }
 
         if ( ! $has_section ) {
-            return new \WP_Error( 'missing_section', __( 'ZIP must contain section.php.', 'framepress' ) );
+            return new \WP_Error( 'missing_section', __( 'ZIP must contain section.php.', 'hero' ) );
         }
         if ( ! $has_schema ) {
-            return new \WP_Error( 'missing_schema', __( 'ZIP must contain schema.php.', 'framepress' ) );
+            return new \WP_Error( 'missing_schema', __( 'ZIP must contain schema.php.', 'hero' ) );
         }
 
         return true;
@@ -181,7 +188,7 @@ class FramePress_Section_Zip_Manager {
      */
     private function test_schema_file( string $schema_file, string $expected_slug = '' ): true|\WP_Error {
         if ( ! file_exists( $schema_file ) ) {
-            return new \WP_Error( 'schema_missing', __( 'schema.php not found after extraction.', 'framepress' ) );
+            return new \WP_Error( 'schema_missing', __( 'schema.php not found after extraction.', 'hero' ) );
         }
 
         try {
@@ -192,12 +199,12 @@ class FramePress_Section_Zip_Manager {
         }
 
         if ( ! is_array( $result ) ) {
-            return new \WP_Error( 'schema_not_array', __( 'schema.php must return a PHP array.', 'framepress' ) );
+            return new \WP_Error( 'schema_not_array', __( 'schema.php must return a PHP array.', 'hero' ) );
         }
 
         foreach ( [ 'type', 'label', 'settings' ] as $key ) {
             if ( empty( $result[ $key ] ) ) {
-                return new \WP_Error( 'schema_missing_key', sprintf( __( 'schema.php is missing required key: %s', 'framepress' ), $key ) );
+                return new \WP_Error( 'schema_missing_key', sprintf( __( 'schema.php is missing required key: %s', 'hero' ), $key ) );
             }
         }
 
@@ -206,7 +213,7 @@ class FramePress_Section_Zip_Manager {
                 'schema_type_mismatch',
                 sprintf(
                     /* translators: %s: section slug user entered */
-                    __( 'schema.php "type" must be "%s" to match the section slug.', 'framepress' ),
+                    __( 'schema.php "type" must be "%s" to match the section slug.', 'hero' ),
                     $expected_slug
                 )
             );
@@ -229,7 +236,7 @@ class FramePress_Section_Zip_Manager {
             $wpdb->prepare(
                 "SELECT p.ID, p.post_title FROM {$wpdb->posts} p
                  INNER JOIN {$wpdb->postmeta} pm ON pm.post_id = p.ID
-                 WHERE pm.meta_key = '_framepress_sections'
+                 WHERE pm.meta_key = '_hero_sections'
                  AND pm.meta_value LIKE %s",
                 $like
             )
@@ -239,18 +246,68 @@ class FramePress_Section_Zip_Manager {
         }
 
         // Check header option.
-        $header_raw = get_option( 'framepress_header', '' );
+        $header_raw = get_option( 'hero_header', '' );
         if ( $header_raw && str_contains( $header_raw, '"type":"' . $type . '"' ) ) {
             $found[] = [ 'id' => 'header', 'title' => 'Header' ];
         }
 
         // Check footer option.
-        $footer_raw = get_option( 'framepress_footer', '' );
+        $footer_raw = get_option( 'hero_footer', '' );
         if ( $footer_raw && str_contains( $footer_raw, '"type":"' . $type . '"' ) ) {
             $found[] = [ 'id' => 'footer', 'title' => 'Footer' ];
         }
 
         return $found;
+    }
+
+    /**
+     * Import image files found inside a ZIP into the WordPress Media Library.
+     * Non-fatal: errors are silently skipped so section install is not blocked.
+     */
+    private function import_images_from_zip( \ZipArchive $zip ): void {
+        static $loaded = false;
+        if ( ! $loaded ) {
+            require_once ABSPATH . 'wp-admin/includes/file.php';
+            require_once ABSPATH . 'wp-admin/includes/media.php';
+            require_once ABSPATH . 'wp-admin/includes/image.php';
+            $loaded = true;
+        }
+
+        $image_exts = [ 'jpg', 'jpeg', 'png', 'gif', 'webp', 'svg' ];
+
+        for ( $i = 0; $i < $zip->numFiles; $i++ ) {
+            $name = $zip->getNameIndex( $i );
+            $ext  = strtolower( pathinfo( $name, PATHINFO_EXTENSION ) );
+
+            if ( ! in_array( $ext, $image_exts, true ) ) {
+                continue;
+            }
+
+            $basename = basename( $name );
+            $tmp_path = sys_get_temp_dir() . '/' . wp_unique_filename( sys_get_temp_dir(), $basename );
+
+            $content = $zip->getFromIndex( $i );
+            if ( $content === false ) {
+                continue;
+            }
+
+            // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+            if ( file_put_contents( $tmp_path, $content ) === false ) {
+                continue;
+            }
+
+            $file_array = [
+                'name'     => $basename,
+                'tmp_name' => $tmp_path,
+            ];
+
+            $attachment_id = media_handle_sideload( $file_array, 0 );
+
+            // Clean up temp file if sideload didn't move it.
+            if ( file_exists( $tmp_path ) ) {
+                @unlink( $tmp_path );
+            }
+        }
     }
 
     /**

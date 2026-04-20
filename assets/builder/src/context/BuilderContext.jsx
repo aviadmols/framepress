@@ -1,11 +1,11 @@
 import { createContext, useContext, useReducer, useEffect } from 'react';
 import { builderReducer, initialState } from './builderReducer';
-import { api } from '../api/framepress-api';
+import { api } from '../api/hero-api';
 
 const BuilderContext = createContext( null );
 
 export function BuilderProvider( { children } ) {
-    const wpData = window.framepressData || {};
+    const wpData = window.heroData || {};
 
     const [ state, dispatch ] = useReducer( builderReducer, {
         ...initialState,
@@ -18,7 +18,7 @@ export function BuilderProvider( { children } ) {
     useEffect( () => {
         const load = async () => {
             try {
-                const fd            = window.framepressData || {};
+                const fd            = window.heroData || {};
                 const schemaContext = fd.context === 'elementor-section' ? 'page' : ( fd.context || 'page' );
                 const [ schemasData, blocksData, globalData ] = await Promise.all( [
                     api.getSchemas( schemaContext ),
@@ -33,7 +33,7 @@ export function BuilderProvider( { children } ) {
                     googleFonts: globalData.googleFonts || [],
                 } );
             } catch ( e ) {
-                console.error( '[FramePress] Failed to load schemas', e );
+                console.error( '[HERO] Failed to load schemas', e );
             }
         };
         load();
@@ -50,7 +50,7 @@ export function BuilderProvider( { children } ) {
                 } else if ( state.context === 'footer' ) {
                     sections = await api.getFooter();
                 } else if ( state.context === 'elementor-section' ) {
-                    const fd = window.framepressData || {};
+                    const fd = window.heroData || {};
                     if ( fd.elementorSectionKey && fd.postId && fd.sectionType ) {
                         const data = await api.getElementorSection(
                             fd.elementorSectionKey,
@@ -62,7 +62,7 @@ export function BuilderProvider( { children } ) {
                 }
                 dispatch( { type: 'LOAD_SECTIONS', sections } );
             } catch ( e ) {
-                console.error( '[FramePress] Failed to load sections', e );
+                console.error( '[HERO] Failed to load sections', e );
             }
         };
         loadSections();
@@ -82,7 +82,7 @@ export function BuilderProvider( { children } ) {
             } else if ( state.context === 'global' ) {
                 await api.saveGlobalSettings( state.globalSettings );
             } else if ( state.context === 'elementor-section' ) {
-                const fd = window.framepressData || {};
+                const fd = window.heroData || {};
                 await api.saveElementorSection(
                     fd.elementorSectionKey,
                     fd.postId,
@@ -92,7 +92,7 @@ export function BuilderProvider( { children } ) {
             }
             dispatch( { type: 'SAVE_SUCCESS' } );
         } catch ( e ) {
-            console.error( '[FramePress] Save failed', e );
+            console.error( '[HERO] Save failed', e );
             dispatch( { type: 'SAVE_ERROR', message: e.message } );
         }
     };

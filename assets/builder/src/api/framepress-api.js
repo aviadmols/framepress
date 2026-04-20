@@ -1,9 +1,9 @@
 /**
- * FramePress REST API client.
+ * HERO REST API client.
  * Thin fetch wrapper — all calls include the WP REST nonce.
  */
 
-const { restUrl, nonce } = window.framepressData || {};
+const { restUrl, nonce } = window.heroData || {};
 
 async function request( path, options = {} ) {
     const url = restUrl.replace( /\/$/, '' ) + '/' + path.replace( /^\//, '' );

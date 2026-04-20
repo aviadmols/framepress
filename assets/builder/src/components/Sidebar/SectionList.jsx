@@ -20,7 +20,7 @@ import SectionPicker        from '../SectionPicker/SectionPicker';
 export default function SectionList() {
     const { state, dispatch } = useBuilder();
     const [ pickerOpen, setPickerOpen ] = useState( false );
-    const isElementorEmbed = ( window.framepressData?.context ) === 'elementor-section';
+    const isElementorEmbed = ( window.heroData?.context ) === 'elementor-section';
 
     const sensors = useSensors(
         useSensor( PointerSensor ),

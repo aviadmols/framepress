@@ -58,7 +58,7 @@ $posts_query = new WP_Query( $query_args );
             <?php endwhile; wp_reset_postdata(); ?>
         </div>
         <?php else : ?>
-        <p class="fp-posts-grid__empty"><?php esc_html_e( 'No posts found.', 'framepress' ); ?></p>
+        <p class="fp-posts-grid__empty"><?php esc_html_e( 'No posts found.', 'hero' ); ?></p>
         <?php endif; ?>
 
     </div>

@@ -1,6 +1,6 @@
 <?php
 /**
- * FramePress Global Settings Schema
+ * HERO Global Settings Schema
  *
  * Returns the full schema for global design tokens.
  * Fields with a 'var' key are output as CSS custom properties on :root.
@@ -110,7 +110,7 @@ return [
                     'type'        => 'checkbox',
                     'label'       => 'Enable Elementor Widgets',
                     'default'     => false,
-                    'description' => 'Register FramePress sections as Elementor widgets.',
+                    'description' => 'Register HERO sections as Elementor widgets.',
                 ],
             ],
         ],
@@ -119,8 +119,8 @@ return [
             'label' => 'Custom CSS',
             'settings' => [
                 [ 'id' => 'custom_css_global', 'type' => 'textarea', 'label' => 'Global CSS',  'default' => '', 'description' => 'Applied to every page. No scoping.' ],
-                [ 'id' => 'custom_css_header', 'type' => 'textarea', 'label' => 'Header CSS',  'default' => '', 'description' => 'Scoped inside .framepress-header' ],
-                [ 'id' => 'custom_css_footer', 'type' => 'textarea', 'label' => 'Footer CSS',  'default' => '', 'description' => 'Scoped inside .framepress-footer' ],
+                [ 'id' => 'custom_css_header', 'type' => 'textarea', 'label' => 'Header CSS',  'default' => '', 'description' => 'Scoped inside .hero-header' ],
+                [ 'id' => 'custom_css_footer', 'type' => 'textarea', 'label' => 'Footer CSS',  'default' => '', 'description' => 'Scoped inside .hero-footer' ],
             ],
         ],
 

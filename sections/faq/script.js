@@ -1,4 +1,4 @@
-/* FramePress — FAQ accordion toggle */
+/* HERO — FAQ accordion toggle */
 function fpFaqToggle(btn) {
     var expanded = btn.getAttribute('aria-expanded') === 'true';
     var answerId = btn.getAttribute('aria-controls');

@@ -1,10 +1,10 @@
 /**
- * FramePress Frontend Base Styles
+ * HERO Frontend Base Styles
  *
  * Provides only the minimal shared utilities used across all sections.
  * Section-specific styles live in each section's own style.css file.
  * Global design tokens are output as CSS custom properties on :root by
- * FramePress_Global_Settings::output_css_variables().
+ * HERO_Global_Settings::output_css_variables().
  */
 
 /* ── Container ───────────────────────────────────────────────────────────── */
@@ -26,15 +26,15 @@
 
 /* ── Section wrapper ─────────────────────────────────────────────────────── */
 
-.framepress-section {
+.hero-section {
     position: relative;
     box-sizing: border-box;
 }
 
 /* ── Header / Footer wrappers ────────────────────────────────────────────── */
 
-.framepress-header,
-.framepress-footer {
+.hero-header,
+.hero-footer {
     position: relative;
 }
 

@@ -9,7 +9,7 @@ import { useBuilder }       from './context/BuilderContext';
 
 export default function App() {
     const { state } = useBuilder();
-    const context   = window.framepressData?.context || state.context;
+    const context   = window.heroData?.context || state.context;
 
     // Dedicated full-page UIs for non-builder contexts.
     if ( context === 'ai-settings' ) {

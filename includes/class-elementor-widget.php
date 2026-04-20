@@ -1,12 +1,12 @@
 <?php
 /**
- * FramePress Elementor widget — one registered widget type per section schema.
+ * HERO Elementor widget — one registered widget type per section schema.
  * Loaded only from elementor/widgets/register so Elementor\Widget_Base exists.
  */
 
 defined( 'ABSPATH' ) || exit;
 
-class FramePress_Elementor_Section_Widget extends \Elementor\Widget_Base {
+class Hero_Elementor_Section_Widget extends \Elementor\Widget_Base {
 
     /** @var array<string, array> */
     private static array $schemas = [];
@@ -31,7 +31,7 @@ class FramePress_Elementor_Section_Widget extends \Elementor\Widget_Base {
     }
 
     /**
-     * @param array<string, array> $sections Section schemas from FramePress_Section_Registry::get_all_sections().
+     * @param array<string, array> $sections Section schemas from Hero_Section_Registry::get_all_sections().
      */
     public static function set_schemas( array $sections ): void {
         self::$schemas = [];
@@ -60,7 +60,7 @@ class FramePress_Elementor_Section_Widget extends \Elementor\Widget_Base {
         if ( $label !== '' ) {
             return (string) $label;
         }
-        return __( 'FramePress Section', 'framepress' );
+        return __( 'HERO Section', 'hero' );
     }
 
     public function get_icon(): string {
@@ -68,13 +68,13 @@ class FramePress_Elementor_Section_Widget extends \Elementor\Widget_Base {
     }
 
     public function get_categories(): array {
-        return [ 'framepress' ];
+        return [ 'hero' ];
     }
 
     public function get_keywords(): array {
         $schema = $this->get_section_schema();
         $type   = $schema['type'] ?? '';
-        return array_filter( [ 'framepress', 'section', $type ] );
+        return array_filter( [ 'hero', 'section', $type ] );
     }
 
     /**
@@ -92,7 +92,7 @@ class FramePress_Elementor_Section_Widget extends \Elementor\Widget_Base {
         }
 
         $this->start_controls_section( 'content_section', [
-            'label' => $schema['label'] ?? __( 'FramePress Section', 'framepress' ),
+            'label' => $schema['label'] ?? __( 'HERO Section', 'hero' ),
             'tab'   => \Elementor\Controls_Manager::TAB_CONTENT,
         ] );
 
@@ -202,7 +202,7 @@ class FramePress_Elementor_Section_Widget extends \Elementor\Widget_Base {
             default:
                 if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
                     // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
-                    error_log( 'FramePress Elementor: unsupported field type "' . $type . '" for control ' . $id );
+                    error_log( 'HERO Elementor: unsupported field type "' . $type . '" for control ' . $id );
                 }
                 return;
         }
@@ -241,7 +241,7 @@ class FramePress_Elementor_Section_Widget extends \Elementor\Widget_Base {
     }
 
     private function get_option_key(): string {
-        return 'framepress_el_' . $this->get_storage_hash();
+        return 'hero_el_' . $this->get_storage_hash();
     }
 
     private function get_main_post_id(): int {
@@ -298,18 +298,18 @@ class FramePress_Elementor_Section_Widget extends \Elementor\Widget_Base {
         }
         $url = $this->build_edit_url( $type );
         return '<p style="color:#6d7175;font-size:12px;margin:8px 0 0;">'
-            . esc_html__( 'Block content (buttons, columns, FAQ items, etc.) is edited in FramePress.', 'framepress' )
+            . esc_html__( 'Block content (buttons, columns, FAQ items, etc.) is edited in HERO.', 'hero' )
             . '</p>'
             . '<a href="' . esc_url( $url ) . '" target="_blank" '
             . 'style="display:inline-block;margin-top:8px;padding:7px 16px;background:#2c6ecb;color:#fff;border-radius:5px;font-size:12px;font-weight:600;text-decoration:none;">'
-            . esc_html__( 'Edit in FramePress', 'framepress' ) . '</a>';
+            . esc_html__( 'Edit in HERO', 'hero' ) . '</a>';
     }
 
     private function build_edit_url( string $section_type ): string {
         return admin_url(
             add_query_arg(
                 [
-                    'page'              => 'framepress',
+                    'page'              => 'hero',
                     'context'           => 'elementor-section',
                     'section_key'        => $this->get_storage_hash(),
                     'section_type'       => $section_type,
@@ -327,17 +327,17 @@ class FramePress_Elementor_Section_Widget extends \Elementor\Widget_Base {
         if ( $type === '' ) {
             if ( \Elementor\Plugin::$instance->editor->is_edit_mode() ) {
                 echo '<div style="padding:20px;background:#f6f6f7;border:2px dashed #c9cccf;border-radius:6px;color:#6d7175;font-family:sans-serif;font-size:13px;line-height:1.5;">'
-                    . '<strong>' . esc_html__( 'FramePress', 'framepress' ) . '</strong><br>'
+                    . '<strong>' . esc_html__( 'HERO', 'hero' ) . '</strong><br>'
                     . esc_html__(
-                        'This block does not match a registered section. Remove it and add a FramePress widget from the panel (e.g. Hero, FAQ), or enable FramePress → Global Settings → Integrations.',
-                        'framepress'
+                        'This block does not match a registered section. Remove it and add a HERO widget from the panel (e.g. Hero, FAQ), or enable HERO → Global Settings → Integrations.',
+                        'hero'
                     )
                     . '</div>';
             }
             return;
         }
 
-        $fp     = FramePress::get_instance();
+        $fp     = HERO::get_instance();
         $assets = $fp->assets;
         $assets->enqueue_one_section_type( $type );
 

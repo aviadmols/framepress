@@ -1,6 +1,6 @@
 <?php
 /**
- * FramePress Section Renderer
+ * HERO Section Renderer
  *
  * Responsible for turning stored section-instance data into safe HTML output.
  * All variables exposed to section.php / block.php templates are sanitised here.
@@ -9,14 +9,14 @@
 
 defined( 'ABSPATH' ) || exit;
 
-class FramePress_Section_Renderer {
+class Hero_Section_Renderer {
 
-    private FramePress_Section_Registry $section_registry;
-    private FramePress_Block_Registry   $block_registry;
+    private Hero_Section_Registry $section_registry;
+    private Hero_Block_Registry   $block_registry;
 
     public function __construct(
-        FramePress_Section_Registry $section_registry,
-        FramePress_Block_Registry   $block_registry
+        Hero_Section_Registry $section_registry,
+        Hero_Block_Registry   $block_registry
     ) {
         $this->section_registry = $section_registry;
         $this->block_registry   = $block_registry;
@@ -59,9 +59,9 @@ class FramePress_Section_Renderer {
         $html = $this->load_template( $template_file, $settings, $blocks, $section );
 
         // Wrap in a uniquely-identified container.
-        $wrapper_class = 'framepress-section framepress-section--' . esc_attr( $type );
+        $wrapper_class = 'hero-section hero-section--' . esc_attr( $type );
         $output        = sprintf(
-            '<div id="framepress-section-%s" class="%s">',
+            '<div id="hero-section-%s" class="%s">',
             esc_attr( $section_id ),
             $wrapper_class
         );
@@ -92,7 +92,7 @@ class FramePress_Section_Renderer {
     // ─── WordPress output hooks ───────────────────────────────────────────────
 
     /**
-     * Replace the_content for FramePress-managed pages.
+     * Replace the_content for HERO-managed pages.
      * Hooked to `the_content`.
      */
     public function filter_page_content( string $content ): string {
@@ -100,15 +100,15 @@ class FramePress_Section_Renderer {
             return $content;
         }
 
-        $is_preview = (bool) apply_filters( 'framepress_is_preview', false );
+        $is_preview = (bool) apply_filters( 'hero_is_preview', false );
         $post_id    = get_the_ID();
-        $raw        = get_post_meta( $post_id, '_framepress_sections', true );
+        $raw        = get_post_meta( $post_id, '_hero_sections', true );
 
         if ( empty( $raw ) ) {
             // In preview mode inject an empty container so the JS bridge
             // has a reliable anchor point for newly added sections.
             if ( $is_preview ) {
-                return '<div class="framepress-sections-container framepress-sections-container--empty"></div>';
+                return '<div class="hero-sections-container hero-sections-container--empty"></div>';
             }
             return $content;
         }
@@ -116,14 +116,14 @@ class FramePress_Section_Renderer {
         $instances = json_decode( $raw, true );
         if ( ! is_array( $instances ) ) {
             return $is_preview
-                ? '<div class="framepress-sections-container framepress-sections-container--empty"></div>'
+                ? '<div class="hero-sections-container hero-sections-container--empty"></div>'
                 : $content;
         }
 
         $html = $this->render_sections( $instances );
 
         // Always wrap in named container so the preview bridge can find it.
-        return '<div class="framepress-sections-container">' . $html . '</div>';
+        return '<div class="hero-sections-container">' . $html . '</div>';
     }
 
     /**
@@ -131,7 +131,7 @@ class FramePress_Section_Renderer {
      * Hooked to `wp_body_open`.
      */
     public function output_header_sections(): void {
-        $raw = get_option( 'framepress_header', '' );
+        $raw = get_option( 'hero_header', '' );
         if ( empty( $raw ) ) {
             return;
         }
@@ -139,7 +139,7 @@ class FramePress_Section_Renderer {
         if ( ! is_array( $instances ) ) {
             return;
         }
-        echo '<header id="framepress-header" class="framepress-header">';
+        echo '<header id="hero-header" class="hero-header">';
         echo $this->render_sections( $instances ); // phpcs:ignore WordPress.Security.EscapeOutput
         echo '</header>';
     }
@@ -149,7 +149,7 @@ class FramePress_Section_Renderer {
      * Hooked to `wp_footer`.
      */
     public function output_footer_sections(): void {
-        $raw = get_option( 'framepress_footer', '' );
+        $raw = get_option( 'hero_footer', '' );
         if ( empty( $raw ) ) {
             return;
         }
@@ -157,7 +157,7 @@ class FramePress_Section_Renderer {
         if ( ! is_array( $instances ) ) {
             return;
         }
-        echo '<footer id="framepress-footer" class="framepress-footer">';
+        echo '<footer id="hero-footer" class="hero-footer">';
         echo $this->render_sections( $instances ); // phpcs:ignore WordPress.Security.EscapeOutput
         echo '</footer>';
     }
@@ -166,7 +166,7 @@ class FramePress_Section_Renderer {
      * Collect all active section types used on the current page
      * (page + header + footer combined).
      *
-     * Used by FramePress_Section_Assets to enqueue only needed assets.
+     * Used by Hero_Section_Assets to enqueue only needed assets.
      *
      * @return string[] Array of section type slugs.
      */
@@ -175,7 +175,7 @@ class FramePress_Section_Renderer {
 
         // Page sections.
         if ( is_singular() ) {
-            $raw = get_post_meta( get_the_ID(), '_framepress_sections', true );
+            $raw = get_post_meta( get_the_ID(), '_hero_sections', true );
             if ( $raw ) {
                 $instances = json_decode( $raw, true );
                 if ( is_array( $instances ) ) {
@@ -187,7 +187,7 @@ class FramePress_Section_Renderer {
         }
 
         // Header sections.
-        $raw = get_option( 'framepress_header', '' );
+        $raw = get_option( 'hero_header', '' );
         if ( $raw ) {
             $instances = json_decode( $raw, true );
             if ( is_array( $instances ) ) {
@@ -198,7 +198,7 @@ class FramePress_Section_Renderer {
         }
 
         // Footer sections.
-        $raw = get_option( 'framepress_footer', '' );
+        $raw = get_option( 'hero_footer', '' );
         if ( $raw ) {
             $instances = json_decode( $raw, true );
             if ( is_array( $instances ) ) {
@@ -214,7 +214,7 @@ class FramePress_Section_Renderer {
          *
          * @param string[] $types Section type slugs.
          */
-        return array_unique( array_filter( apply_filters( 'framepress_active_section_types', $types ) ) );
+        return array_unique( array_filter( apply_filters( 'hero_active_section_types', $types ) ) );
     }
 
     // ─── Internal helpers ─────────────────────────────────────────────────────
@@ -232,7 +232,7 @@ class FramePress_Section_Renderer {
                 ob_end_clean();
                 // Always show inline error — section errors must be visible so they can be fixed.
                 return '<div style="border:2px solid #d63638;padding:12px 16px;margin:8px 0;font-family:monospace;font-size:13px;color:#d63638;background:#fff0f0;direction:ltr;text-align:left">'
-                    . '<strong>FramePress section error</strong> in <em>' . esc_html( basename( $__file ) ) . '</em>:<br><br>'
+                    . '<strong>HERO section error</strong> in <em>' . esc_html( basename( $__file ) ) . '</em>:<br><br>'
                     . esc_html( $e->getMessage() ) . '<br>'
                     . '<small style="color:#999">Line ' . esc_html( (string) $e->getLine() ) . ' · ' . esc_html( $e->getFile() ) . '</small>'
                     . '</div>';
@@ -310,8 +310,8 @@ class FramePress_Section_Renderer {
      * Scope all CSS rules to a unique section wrapper ID.
      *
      * Handles basic cases:
-     *   .foo { ... }          →  #framepress-section-{id} .foo { ... }
-     *   .foo, .bar { ... }    →  #framepress-section-{id} .foo, #framepress-section-{id} .bar { ... }
+     *   .foo { ... }          →  #hero-section-{id} .foo { ... }
+     *   .foo, .bar { ... }    →  #hero-section-{id} .foo, #hero-section-{id} .bar { ... }
      *   @media (...) { ... }  →  kept as-is, inner rules scoped
      *
      * Strips </style> injection attempts.
@@ -319,7 +319,7 @@ class FramePress_Section_Renderer {
     public function scope_css( string $css, string $section_id ): string {
         // Prevent </style> injection.
         $css    = str_ireplace( '</style>', '', $css );
-        $prefix = '#framepress-section-' . $section_id;
+        $prefix = '#hero-section-' . $section_id;
 
         // Very lightweight regex-based scoping for non-at-rule blocks.
         // This covers the 95% case without a full CSS parser.

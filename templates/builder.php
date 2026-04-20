@@ -1,6 +1,6 @@
 <?php
 /**
- * FramePress Builder — bare HTML shell.
+ * HERO Builder — bare HTML shell.
  *
  * This is a full-viewport admin page that mounts the React builder application.
  * It intentionally bypasses WP admin chrome to give the builder maximum screen space.
@@ -16,7 +16,7 @@ defined( 'ABSPATH' ) || exit;
 <head>
     <meta charset="<?php bloginfo( 'charset' ); ?>">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php esc_html_e( 'FramePress Builder', 'framepress' ); ?> — <?php bloginfo( 'name' ); ?></title>
+    <title><?php esc_html_e( 'HERO Builder', 'hero' ); ?> — <?php bloginfo( 'name' ); ?></title>
     <?php wp_enqueue_media(); wp_head(); ?>
     <style>
         /* Reset admin body styles so the builder fills the viewport cleanly */
@@ -35,7 +35,7 @@ defined( 'ABSPATH' ) || exit;
         #wpcontent, #wpfooter {
             margin-left: 0 !important;
         }
-        #framepress-builder-root {
+        #hero-builder-root {
             position: absolute;
     width: 100vw;
     height: 100vh;
@@ -45,8 +45,8 @@ defined( 'ABSPATH' ) || exit;
         }
     </style>
 </head>
-<body class="framepress-builder-body">
-    <div id="framepress-builder-root"></div>
+<body class="hero-builder-body">
+    <div id="hero-builder-root"></div>
     <?php wp_footer(); ?>
 </body>
 </html>

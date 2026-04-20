@@ -3,7 +3,7 @@ import SectionList    from './SectionList';
 
 export default function Sidebar() {
     const { state, dispatch, save } = useBuilder();
-    const wpData = window.framepressData || {};
+    const wpData = window.heroData || {};
     const isElementorEmbed = wpData.context === 'elementor-section';
 
     const contexts = [
@@ -17,11 +17,11 @@ export default function Sidebar() {
             {/* Header */}
             <div className="fp-sidebar__header">
                 <span className="fp-sidebar__logo">
-                    { isElementorEmbed ? 'FramePress · Elementor' : 'FramePress' }
+                    { isElementorEmbed ? 'HERO · Elementor' : 'HERO' }
                 </span>
                 <div className="fp-sidebar__header-actions">
                     <a
-                        href={ wpData.adminUrl + 'admin.php?page=framepress-global' }
+                        href={ wpData.adminUrl + 'admin.php?page=hero-global' }
                         className="fp-icon-btn"
                         title="Global Settings"
                     >

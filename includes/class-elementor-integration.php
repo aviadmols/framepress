@@ -1,21 +1,21 @@
 <?php
 /**
- * FramePress Elementor Integration
+ * HERO Elementor Integration
  *
- * Registers one Elementor widget per FramePress section type (e.g. fp-hero, fp-faq)
- * plus the legacy widget `framepress-section` for older saved pages.
+ * Registers one Elementor widget per HERO section type (e.g. fp-hero, fp-faq)
+ * plus the legacy widget `hero-section` for older saved pages.
  * Optional instance data for blocks / legacy JSON is stored in wp_options as
- * framepress_el_{md5(post_id|elementor_element_id)}.
+ * hero_el_{md5(post_id|elementor_element_id)}.
  *
  * The widget class lives in class-elementor-widget.php and is loaded only from
  * elementor/widgets/register so Elementor\Widget_Base exists (avoids fatals on wp-admin).
  *
- * Enable under FramePress → Global Settings → Integrations → Enable Elementor Widgets.
+ * Enable under HERO → Global Settings → Integrations → Enable Elementor Widgets.
  */
 
 defined( 'ABSPATH' ) || exit;
 
-class FramePress_Elementor_Integration {
+class Hero_Elementor_Integration {
 
     /** @var bool */
     private static $initialized = false;
@@ -28,11 +28,11 @@ class FramePress_Elementor_Integration {
 
         add_action( 'elementor/elements/categories_registered', [ __CLASS__, 'register_category' ] );
         add_action( 'elementor/widgets/register', [ __CLASS__, 'register_widget' ] );
-        add_filter( 'framepress_active_section_types', [ __CLASS__, 'filter_active_section_types' ] );
+        add_filter( 'hero_active_section_types', [ __CLASS__, 'filter_active_section_types' ] );
     }
 
     /**
-     * Merge FramePress section types referenced by Elementor document data so
+     * Merge HERO section types referenced by Elementor document data so
      * `wp_enqueue_scripts` can load `sections/{type}/style.css` before `wp_head`.
      * (Widget `render()` runs in the body — too late for `wp_enqueue_style` in the head.)
      *
@@ -60,7 +60,7 @@ class FramePress_Elementor_Integration {
     }
 
     /**
-     * Parse `_elementor_data` for fp-* widgets and legacy `framepress-section`.
+     * Parse `_elementor_data` for fp-* widgets and legacy `hero-section`.
      *
      * @return string[]
      */
@@ -100,7 +100,7 @@ class FramePress_Elementor_Integration {
                     if ( $slug !== '' ) {
                         $out[] = sanitize_key( $slug );
                     }
-                } elseif ( $widget_type === 'framepress-section' ) {
+                } elseif ( $widget_type === 'hero-section' ) {
                     $settings = isset( $el['settings'] ) && is_array( $el['settings'] ) ? $el['settings'] : [];
                     $st       = isset( $settings['section_type'] ) ? sanitize_key( (string) $settings['section_type'] ) : '';
                     if ( $st !== '' ) {
@@ -117,7 +117,7 @@ class FramePress_Elementor_Integration {
     }
 
     /**
-     * Custom panel group so widgets appear under "FramePress" in the library.
+     * Custom panel group so widgets appear under "HERO" in the library.
      *
      * @param mixed $elements_manager \Elementor\Elements_Manager
      */
@@ -128,16 +128,16 @@ class FramePress_Elementor_Integration {
 
         try {
             $elements_manager->add_category(
-                'framepress',
+                'hero',
                 [
-                    'title' => __( 'FramePress', 'framepress' ),
+                    'title' => __( 'HERO', 'hero' ),
                     'icon'  => 'fa fa-plug',
                 ]
             );
         } catch ( \Throwable $e ) {
             if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
                 // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
-                error_log( 'FramePress: Elementor add_category failed: ' . $e->getMessage() );
+                error_log( 'HERO: Elementor add_category failed: ' . $e->getMessage() );
             }
         }
     }
@@ -150,11 +150,11 @@ class FramePress_Elementor_Integration {
             return;
         }
 
-        require_once FRAMEPRESS_DIR . 'includes/class-elementor-widget.php';
-        require_once FRAMEPRESS_DIR . 'includes/class-elementor-widget-legacy.php';
+        require_once HERO_DIR . 'includes/class-elementor-widget.php';
+        require_once HERO_DIR . 'includes/class-elementor-widget-legacy.php';
 
-        $sections = FramePress_Section_Registry::get_instance()->get_all_sections();
-        FramePress_Elementor_Section_Widget::set_schemas( $sections );
+        $sections = Hero_Section_Registry::get_instance()->get_all_sections();
+        Hero_Elementor_Section_Widget::set_schemas( $sections );
 
         foreach ( $sections as $schema ) {
             $type = isset( $schema['type'] ) ? sanitize_key( (string) $schema['type'] ) : '';
@@ -165,12 +165,12 @@ class FramePress_Elementor_Integration {
             if ( null !== $manager->get_widget_types( $name ) ) {
                 continue;
             }
-            $manager->register( new FramePress_Elementor_Section_Widget( [], [ 'fp_section_type' => $type ] ) );
+            $manager->register( new Hero_Elementor_Section_Widget( [], [ 'fp_section_type' => $type ] ) );
         }
 
-        if ( null === $manager->get_widget_types( 'framepress-section' ) ) {
+        if ( null === $manager->get_widget_types( 'hero-section' ) ) {
             // Non-null $args keeps Elementor happy if prototype detection ever changes.
-            $manager->register( new FramePress_Elementor_Legacy_Section_Widget( [], [ 'fp_legacy_prototype' => true ] ) );
+            $manager->register( new Hero_Elementor_Legacy_Section_Widget( [], [ 'fp_legacy_prototype' => true ] ) );
         }
     }
 }

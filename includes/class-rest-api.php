@@ -1,27 +1,27 @@
 <?php
 /**
- * FramePress REST API
+ * HERO REST API
  *
- * All endpoints under the framepress/v1 namespace.
+ * All endpoints under the hero/v1 namespace.
  * Permission: current_user_can('edit_pages') + X-WP-Nonce header (handled by WP core).
  */
 
 defined( 'ABSPATH' ) || exit;
 
-class FramePress_Rest_API {
+class Hero_Rest_API {
 
-    private FramePress_Section_Registry $section_registry;
-    private FramePress_Block_Registry   $block_registry;
-    private FramePress_Section_Renderer $renderer;
-    private FramePress_Global_Settings  $global_settings;
+    private Hero_Section_Registry $section_registry;
+    private Hero_Block_Registry   $block_registry;
+    private Hero_Section_Renderer $renderer;
+    private Hero_Global_Settings  $global_settings;
 
-    private const NS = 'framepress/v1';
+    private const NS = 'hero/v1';
 
     public function __construct(
-        FramePress_Section_Registry $section_registry,
-        FramePress_Block_Registry   $block_registry,
-        FramePress_Section_Renderer $renderer,
-        FramePress_Global_Settings  $global_settings
+        Hero_Section_Registry $section_registry,
+        Hero_Block_Registry   $block_registry,
+        Hero_Section_Renderer $renderer,
+        Hero_Global_Settings  $global_settings
     ) {
         $this->section_registry = $section_registry;
         $this->block_registry   = $block_registry;
@@ -115,6 +115,12 @@ class FramePress_Rest_API {
         register_rest_route( self::NS, '/sections/upload', [
             'methods'             => 'POST',
             'callback'            => [ $this, 'upload_section' ],
+            'permission_callback' => [ $this, 'editor_permission' ],
+        ] );
+
+        register_rest_route( self::NS, '/sections/bulk-upload', [
+            'methods'             => 'POST',
+            'callback'            => [ $this, 'bulk_upload_sections' ],
             'permission_callback' => [ $this, 'editor_permission' ],
         ] );
 
@@ -262,7 +268,7 @@ class FramePress_Rest_API {
 
     public function get_page_sections( \WP_REST_Request $request ): \WP_REST_Response {
         $post_id  = (int) $request->get_param( 'id' );
-        $raw      = get_post_meta( $post_id, '_framepress_sections', true );
+        $raw      = get_post_meta( $post_id, '_hero_sections', true );
         $sections = $raw ? json_decode( $raw, true ) : [];
         return rest_ensure_response( is_array( $sections ) ? $sections : [] );
     }
@@ -277,7 +283,7 @@ class FramePress_Rest_API {
         }
 
         $clean = $this->sanitize_sections( $sections );
-        update_post_meta( $post_id, '_framepress_sections', wp_json_encode( $clean ) );
+        update_post_meta( $post_id, '_hero_sections', wp_json_encode( $clean ) );
 
         return rest_ensure_response( [ 'success' => true, 'sections' => $clean ] );
     }
@@ -285,7 +291,7 @@ class FramePress_Rest_API {
     // ─── Header / Footer ──────────────────────────────────────────────────────
 
     public function get_header( \WP_REST_Request $request ): \WP_REST_Response {
-        $raw      = get_option( 'framepress_header', '[]' );
+        $raw      = get_option( 'hero_header', '[]' );
         $sections = json_decode( $raw, true );
         return rest_ensure_response( is_array( $sections ) ? $sections : [] );
     }
@@ -297,12 +303,12 @@ class FramePress_Rest_API {
             return new \WP_REST_Response( [ 'error' => 'sections must be an array' ], 400 );
         }
         $clean = $this->sanitize_sections( $sections );
-        update_option( 'framepress_header', wp_json_encode( $clean ) );
+        update_option( 'hero_header', wp_json_encode( $clean ) );
         return rest_ensure_response( [ 'success' => true, 'sections' => $clean ] );
     }
 
     public function get_footer( \WP_REST_Request $request ): \WP_REST_Response {
-        $raw      = get_option( 'framepress_footer', '[]' );
+        $raw      = get_option( 'hero_footer', '[]' );
         $sections = json_decode( $raw, true );
         return rest_ensure_response( is_array( $sections ) ? $sections : [] );
     }
@@ -314,7 +320,7 @@ class FramePress_Rest_API {
             return new \WP_REST_Response( [ 'error' => 'sections must be an array' ], 400 );
         }
         $clean = $this->sanitize_sections( $sections );
-        update_option( 'framepress_footer', wp_json_encode( $clean ) );
+        update_option( 'hero_footer', wp_json_encode( $clean ) );
         return rest_ensure_response( [ 'success' => true, 'sections' => $clean ] );
     }
 
@@ -329,7 +335,7 @@ class FramePress_Rest_API {
     }
 
     /**
-     * Load a single FramePress section instance used by an Elementor widget (wp_options).
+     * Load a single HERO section instance used by an Elementor widget (wp_options).
      */
     public function get_elementor_section( \WP_REST_Request $request ): \WP_REST_Response {
         $key          = (string) ( $request['key'] ?? '' );
@@ -344,7 +350,7 @@ class FramePress_Rest_API {
             return new \WP_REST_Response( [ 'error' => 'Forbidden' ], 403 );
         }
 
-        $raw  = get_option( 'framepress_el_' . $key, '' );
+        $raw  = get_option( 'hero_el_' . $key, '' );
         $data = $raw ? json_decode( $raw, true ) : [];
 
         if ( ! is_array( $data ) || empty( $data ) ) {
@@ -364,7 +370,7 @@ class FramePress_Rest_API {
     }
 
     /**
-     * Save FramePress section data for an Elementor widget instance.
+     * Save HERO section data for an Elementor widget instance.
      */
     public function save_elementor_section( \WP_REST_Request $request ): \WP_REST_Response {
         $key  = (string) ( $request['key'] ?? '' );
@@ -394,7 +400,7 @@ class FramePress_Rest_API {
             return new \WP_REST_Response( [ 'error' => 'Invalid section data' ], 400 );
         }
 
-        update_option( 'framepress_el_' . $key, wp_json_encode( $instance ) );
+        update_option( 'hero_el_' . $key, wp_json_encode( $instance ) );
 
         return rest_ensure_response( [ 'success' => true, 'sections' => [ $instance ] ] );
     }
@@ -414,10 +420,10 @@ class FramePress_Rest_API {
         $raw  = $body['settings'] ?? [];
         if ( is_array( $raw ) ) {
             // Temporarily override settings to build CSS from the draft state.
-            $saved = get_option( 'framepress_global_settings', '{}' );
-            update_option( 'framepress_global_settings', wp_json_encode( $raw ) );
+            $saved = get_option( 'hero_global_settings', '{}' );
+            update_option( 'hero_global_settings', wp_json_encode( $raw ) );
             $css = $this->global_settings->build_css_output();
-            update_option( 'framepress_global_settings', $saved );
+            update_option( 'hero_global_settings', $saved );
         } else {
             $css = $this->global_settings->build_css_output();
         }
@@ -471,7 +477,7 @@ class FramePress_Rest_API {
         $path   = trailingslashit( $schema['_path'] );
         $source = $schema['_source'] ?? 'plugin';
 
-        // Convert filesystem path → public URL (mirrors FramePress_Section_Assets logic).
+        // Convert filesystem path → public URL (mirrors Hero_Section_Assets logic).
         $base_url = match ( $source ) {
             'theme'   => str_replace(
                 trailingslashit( get_stylesheet_directory() ),
@@ -483,7 +489,7 @@ class FramePress_Rest_API {
                 trailingslashit( wp_upload_dir()['baseurl'] ),
                 $path
             ),
-            default   => str_replace( FRAMEPRESS_DIR, FRAMEPRESS_URL, $path ),
+            default   => str_replace( HERO_DIR, HERO_URL, $path ),
         };
 
         return [
@@ -505,7 +511,7 @@ class FramePress_Rest_API {
             return new \WP_REST_Response( [ 'error' => 'Invalid slug' ], 400 );
         }
 
-        $manager = new FramePress_Section_Zip_Manager();
+        $manager = new Hero_Section_Zip_Manager();
         $result  = $manager->install_from_zip( $files['section_zip']['tmp_name'], $slug );
 
         if ( is_wp_error( $result ) ) {
@@ -515,11 +521,46 @@ class FramePress_Rest_API {
         return rest_ensure_response( [ 'success' => true, 'slug' => $slug ] );
     }
 
+    public function bulk_upload_sections( \WP_REST_Request $request ): \WP_REST_Response {
+        $files = $request->get_file_params();
+
+        // PHP flattens multi-file uploads: section_zips[name][], section_zips[tmp_name][], etc.
+        if ( empty( $files['section_zips'] ) || ! is_array( $files['section_zips']['tmp_name'] ) ) {
+            return new \WP_REST_Response( [ 'error' => 'No files uploaded' ], 400 );
+        }
+
+        $manager = new Hero_Section_Zip_Manager();
+        $results = [];
+
+        $count = count( $files['section_zips']['tmp_name'] );
+        for ( $i = 0; $i < $count; $i++ ) {
+            $tmp_name = $files['section_zips']['tmp_name'][ $i ];
+            $name     = $files['section_zips']['name'][ $i ];
+            $error    = $files['section_zips']['error'][ $i ];
+
+            if ( $error !== UPLOAD_ERR_OK || ! $tmp_name ) {
+                $results[] = [ 'slug' => sanitize_title( pathinfo( $name, PATHINFO_FILENAME ) ), 'error' => 'Upload error code ' . $error ];
+                continue;
+            }
+
+            $slug   = sanitize_title( pathinfo( $name, PATHINFO_FILENAME ) );
+            $result = $manager->install_from_zip( $tmp_name, $slug );
+
+            if ( is_wp_error( $result ) ) {
+                $results[] = [ 'slug' => $slug, 'error' => $result->get_error_message() ];
+            } else {
+                $results[] = [ 'slug' => $slug, 'success' => true ];
+            }
+        }
+
+        return rest_ensure_response( [ 'results' => $results ] );
+    }
+
     public function delete_section( \WP_REST_Request $request ): \WP_REST_Response {
         $type         = sanitize_title( $request->get_param( 'type' ) );
         $force_delete = (bool) $request->get_param( 'force' );
 
-        $manager = new FramePress_Section_Zip_Manager();
+        $manager = new Hero_Section_Zip_Manager();
         $result  = $manager->delete_section( $type, $force_delete );
 
         if ( is_wp_error( $result ) ) {
@@ -550,7 +591,7 @@ class FramePress_Rest_API {
             return new \WP_REST_Response( [ 'error' => 'Unknown section type' ], 400 );
         }
 
-        $ai     = new FramePress_AI_Service();
+        $ai     = new Hero_AI_Service();
         $result = $ai->generate_section_settings( $section_type, $prompt, $schema );
 
         if ( is_wp_error( $result ) ) {
@@ -568,7 +609,7 @@ class FramePress_Rest_API {
             return new \WP_REST_Response( [ 'error' => 'prompt is required' ], 400 );
         }
 
-        $ai      = new FramePress_AI_Service();
+        $ai      = new Hero_AI_Service();
         $schemas = $this->section_registry->get_all_sections();
         $result  = $ai->generate_page_structure( $prompt, $schemas );
 
@@ -589,11 +630,11 @@ class FramePress_Rest_API {
 
     /** Return current AI settings (key masked). */
     public function get_ai_settings( \WP_REST_Request $request ): \WP_REST_Response {
-        $has_key = ! empty( get_option( 'framepress_ai_key', '' ) );
+        $has_key = ! empty( get_option( 'hero_ai_key', '' ) );
         return rest_ensure_response( [
-            'provider' => get_option( 'framepress_ai_provider', 'anthropic' ),
-            'model'    => get_option( 'framepress_ai_model', '' ),
-            'enabled'  => (bool) get_option( 'framepress_ai_enabled', false ),
+            'provider' => get_option( 'hero_ai_provider', 'anthropic' ),
+            'model'    => get_option( 'hero_ai_model', '' ),
+            'enabled'  => (bool) get_option( 'hero_ai_enabled', false ),
             'has_key'  => $has_key,
         ] );
     }
@@ -602,13 +643,13 @@ class FramePress_Rest_API {
     public function save_ai_settings( \WP_REST_Request $request ): \WP_REST_Response {
         $body = $request->get_json_params();
 
-        update_option( 'framepress_ai_provider', sanitize_key( $body['provider'] ?? 'anthropic' ) );
-        update_option( 'framepress_ai_model',    sanitize_text_field( $body['model'] ?? '' ) );
-        update_option( 'framepress_ai_enabled',  ! empty( $body['enabled'] ) ? 1 : 0 );
+        update_option( 'hero_ai_provider', sanitize_key( $body['provider'] ?? 'anthropic' ) );
+        update_option( 'hero_ai_model',    sanitize_text_field( $body['model'] ?? '' ) );
+        update_option( 'hero_ai_enabled',  ! empty( $body['enabled'] ) ? 1 : 0 );
 
         $plain_key = trim( (string) ( $body['api_key'] ?? '' ) );
         if ( $plain_key !== '' ) {
-            update_option( 'framepress_ai_key', FramePress_AI_Service::encrypt_api_key( $plain_key ) );
+            update_option( 'hero_ai_key', Hero_AI_Service::encrypt_api_key( $plain_key ) );
         }
 
         return rest_ensure_response( [ 'success' => true ] );
@@ -621,7 +662,7 @@ class FramePress_Rest_API {
     public function ai_generate_section_files( \WP_REST_Request $request ): \WP_REST_Response {
         $body = $request->get_json_params();
         $mode = sanitize_key( $body['mode'] ?? 'description' ); // 'description' | 'html'
-        $ai   = new FramePress_AI_Service();
+        $ai   = new Hero_AI_Service();
 
         // Sanitise image: accept data URI only, strip anything unsafe.
         $image_data = '';
@@ -657,7 +698,7 @@ class FramePress_Rest_API {
      * Allows users to copy it and use it with external AI tools.
      */
     public function ai_get_section_files_prompt(): \WP_REST_Response {
-        $ai = new FramePress_AI_Service();
+        $ai = new Hero_AI_Service();
         return rest_ensure_response( [ 'prompt' => $ai->get_section_files_system_prompt() ] );
     }
 
@@ -680,7 +721,7 @@ class FramePress_Rest_API {
             return new \WP_REST_Response( [ 'error' => 'error message and section_php are required' ], 400 );
         }
 
-        $ai     = new FramePress_AI_Service();
+        $ai     = new Hero_AI_Service();
         $result = $ai->fix_section_files( $files, $error );
 
         if ( is_wp_error( $result ) ) {
@@ -705,7 +746,7 @@ class FramePress_Rest_API {
             return new \WP_REST_Response( [ 'error' => 'slug, schema_php and section_php are required' ], 400 );
         }
 
-        $ai     = new FramePress_AI_Service();
+        $ai     = new Hero_AI_Service();
         $result = $ai->install_section_files( $slug, $schema_php, $section_php, $style_css, $script_js );
 
         if ( is_wp_error( $result ) ) {
@@ -730,29 +771,29 @@ class FramePress_Rest_API {
             'post_type'   => 'any',
             'post_status' => 'any',
             'numberposts' => -1,
-            'meta_key'    => '_framepress_sections',
+            'meta_key'    => '_hero_sections',
         ] );
         foreach ( $pages as $post ) {
-            $raw = get_post_meta( $post->ID, '_framepress_sections', true );
+            $raw = get_post_meta( $post->ID, '_hero_sections', true );
             if ( ! $raw ) continue;
             $instances = json_decode( $raw, true );
             if ( ! is_array( $instances ) ) continue;
             foreach ( $instances as $inst ) {
                 $type = $inst['type'] ?? '';
                 if ( $type ) {
-                    $page_usage[ $type ][] = [ 'id' => $post->ID, 'title' => get_the_title( $post ), 'edit_url' => admin_url( 'admin.php?page=framepress&post_id=' . $post->ID . '&context=page' ) ];
+                    $page_usage[ $type ][] = [ 'id' => $post->ID, 'title' => get_the_title( $post ), 'edit_url' => admin_url( 'admin.php?page=hero&post_id=' . $post->ID . '&context=page' ) ];
                 }
             }
         }
 
         // Collect usage: header / footer
         $header_types = [];
-        $raw = get_option( 'framepress_header', '[]' );
+        $raw = get_option( 'hero_header', '[]' );
         foreach ( json_decode( $raw, true ) ?: [] as $inst ) {
             if ( ! empty( $inst['type'] ) ) $header_types[] = $inst['type'];
         }
         $footer_types = [];
-        $raw = get_option( 'framepress_footer', '[]' );
+        $raw = get_option( 'hero_footer', '[]' );
         foreach ( json_decode( $raw, true ) ?: [] as $inst ) {
             if ( ! empty( $inst['type'] ) ) $footer_types[] = $inst['type'];
         }
@@ -770,8 +811,8 @@ class FramePress_Rest_API {
             }
 
             $usage = $page_usage[ $type ] ?? [];
-            if ( in_array( $type, $header_types, true ) ) $usage[] = [ 'id' => 0, 'title' => 'Header', 'edit_url' => admin_url( 'admin.php?page=framepress&context=header' ) ];
-            if ( in_array( $type, $footer_types, true ) ) $usage[] = [ 'id' => 0, 'title' => 'Footer', 'edit_url' => admin_url( 'admin.php?page=framepress&context=footer' ) ];
+            if ( in_array( $type, $header_types, true ) ) $usage[] = [ 'id' => 0, 'title' => 'Header', 'edit_url' => admin_url( 'admin.php?page=hero&context=header' ) ];
+            if ( in_array( $type, $footer_types, true ) ) $usage[] = [ 'id' => 0, 'title' => 'Footer', 'edit_url' => admin_url( 'admin.php?page=hero&context=footer' ) ];
 
             $result[] = [
                 'type'     => $type,
@@ -809,7 +850,7 @@ class FramePress_Rest_API {
         }
 
         $upload_dir  = wp_upload_dir();
-        $section_dir = trailingslashit( $upload_dir['basedir'] ) . 'framepress/sections/' . $slug . '/';
+        $section_dir = trailingslashit( $upload_dir['basedir'] ) . 'hero/sections/' . $slug . '/';
 
         if ( file_exists( $section_dir ) ) {
             return new \WP_REST_Response( [ 'error' => "Directory already exists for slug '{$slug}'." ], 409 );
@@ -910,7 +951,7 @@ class FramePress_Rest_API {
             }
         }
 
-        delete_transient( 'framepress_section_registry' );
+        delete_transient( 'hero_section_registry' );
 
         return rest_ensure_response( [ 'success' => true, 'type' => $slug ] );
     }
@@ -987,7 +1028,7 @@ class FramePress_Rest_API {
 
         // Bust registry cache if schema.php was updated.
         if ( isset( $files['schema.php'] ) ) {
-            delete_transient( 'framepress_section_registry' );
+            delete_transient( 'hero_section_registry' );
         }
 
         return rest_ensure_response( [ 'success' => true ] );

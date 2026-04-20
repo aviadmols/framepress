@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 
-const REST   = () => window.framepressData?.restUrl || '';
-const NONCE  = () => window.framepressData?.nonce   || '';
+const REST   = () => window.heroData?.restUrl || '';
+const NONCE  = () => window.heroData?.nonce   || '';
 
 const MODES = [
     { id: 'description', label: '✦ Describe a section' },

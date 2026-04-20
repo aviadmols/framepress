@@ -1,6 +1,6 @@
 <?php
 /**
- * FramePress AI Service
+ * HERO AI Service
  *
  * Provider-abstracted LLM integration.
  * Generates section settings JSON and page structures from natural language prompts.
@@ -14,7 +14,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-class FramePress_AI_Service {
+class Hero_AI_Service {
 
     private string $provider;
     private string $api_key;
@@ -22,10 +22,10 @@ class FramePress_AI_Service {
     private bool   $enabled;
 
     public function __construct() {
-        $this->provider = get_option( 'framepress_ai_provider', 'anthropic' );
-        $this->api_key  = $this->decrypt_api_key( get_option( 'framepress_ai_key', '' ) );
-        $this->model    = get_option( 'framepress_ai_model', 'claude-sonnet-4-6' );
-        $this->enabled  = (bool) get_option( 'framepress_ai_enabled', false );
+        $this->provider = get_option( 'hero_ai_provider', 'anthropic' );
+        $this->api_key  = $this->decrypt_api_key( get_option( 'hero_ai_key', '' ) );
+        $this->model    = get_option( 'hero_ai_model', 'claude-sonnet-4-6' );
+        $this->enabled  = (bool) get_option( 'hero_ai_enabled', false );
     }
 
     // ─── Public generation API ────────────────────────────────────────────────
@@ -40,7 +40,7 @@ class FramePress_AI_Service {
      */
     public function generate_section_settings( string $section_type, string $prompt, array $schema ): array|\WP_Error {
         if ( ! $this->is_available() ) {
-            return new \WP_Error( 'ai_disabled', __( 'AI is not configured. Please add an API key in FramePress → AI Settings.', 'framepress' ) );
+            return new \WP_Error( 'ai_disabled', __( 'AI is not configured. Please add an API key in HERO → AI Settings.', 'hero' ) );
         }
 
         $rate_error = $this->check_rate_limit();
@@ -72,7 +72,7 @@ class FramePress_AI_Service {
      */
     public function generate_page_structure( string $prompt, array $available_schemas ): array|\WP_Error {
         if ( ! $this->is_available() ) {
-            return new \WP_Error( 'ai_disabled', __( 'AI is not configured.', 'framepress' ) );
+            return new \WP_Error( 'ai_disabled', __( 'AI is not configured.', 'hero' ) );
         }
 
         $rate_error = $this->check_rate_limit();
@@ -109,7 +109,7 @@ class FramePress_AI_Service {
             case 'openai':
                 return $this->call_openai( $system_prompt, $user_message, $image_base64, $image_mime );
             default:
-                return new \WP_Error( 'unknown_provider', sprintf( __( 'Unknown AI provider: %s', 'framepress' ), $this->provider ) );
+                return new \WP_Error( 'unknown_provider', sprintf( __( 'Unknown AI provider: %s', 'hero' ), $this->provider ) );
         }
     }
 
@@ -192,7 +192,7 @@ class FramePress_AI_Service {
         $body = json_decode( wp_remote_retrieve_body( $response ), true );
 
         if ( $code !== 200 ) {
-            $msg = $body['error']['message'] ?? __( 'API request failed', 'framepress' );
+            $msg = $body['error']['message'] ?? __( 'API request failed', 'hero' );
             return new \WP_Error( 'api_error', $msg );
         }
 
@@ -209,7 +209,7 @@ class FramePress_AI_Service {
         $body = json_decode( wp_remote_retrieve_body( $response ), true );
 
         if ( $code !== 200 ) {
-            $msg = $body['error']['message'] ?? __( 'API request failed', 'framepress' );
+            $msg = $body['error']['message'] ?? __( 'API request failed', 'hero' );
             return new \WP_Error( 'api_error', $msg );
         }
 
@@ -225,7 +225,7 @@ class FramePress_AI_Service {
 
         $decoded = json_decode( $text, true );
         if ( ! is_array( $decoded ) ) {
-            return new \WP_Error( 'json_parse', __( 'AI returned invalid JSON.', 'framepress' ) );
+            return new \WP_Error( 'json_parse', __( 'AI returned invalid JSON.', 'hero' ) );
         }
 
         return $decoded;
@@ -289,7 +289,7 @@ class FramePress_AI_Service {
     // ─── Section file generation (AI → PHP files) ────────────────────────────
 
     /**
-     * Generate FramePress section files (schema.php, section.php, style.css)
+     * Generate HERO section files (schema.php, section.php, style.css)
      * from a natural language description.
      *
      * @param string $description  What the section should do/look like.
@@ -297,13 +297,13 @@ class FramePress_AI_Service {
      */
     public function generate_section_from_description( string $description, string $image_data = '' ): array|\WP_Error {
         if ( ! $this->is_available() ) {
-            return new \WP_Error( 'ai_disabled', __( 'AI is not configured.', 'framepress' ) );
+            return new \WP_Error( 'ai_disabled', __( 'AI is not configured.', 'hero' ) );
         }
         $rate_error = $this->check_rate_limit();
         if ( is_wp_error( $rate_error ) ) return $rate_error;
 
         $system = $this->build_section_files_system_prompt();
-        $user   = "Create a FramePress section for: {$description}";
+        $user   = "Create a HERO section for: {$description}";
         if ( $image_data ) {
             $user .= "\n\nA reference image is attached — use it to match the visual design.";
         }
@@ -317,7 +317,7 @@ class FramePress_AI_Service {
     }
 
     /**
-     * Convert raw HTML into FramePress section files.
+     * Convert raw HTML into HERO section files.
      *
      * @param string $html   The raw HTML to analyse and convert.
      * @param string $slug   Optional suggested slug (user-supplied).
@@ -325,14 +325,14 @@ class FramePress_AI_Service {
      */
     public function generate_section_from_html( string $html, string $slug = '', string $image_data = '' ): array|\WP_Error {
         if ( ! $this->is_available() ) {
-            return new \WP_Error( 'ai_disabled', __( 'AI is not configured.', 'framepress' ) );
+            return new \WP_Error( 'ai_disabled', __( 'AI is not configured.', 'hero' ) );
         }
         $rate_error = $this->check_rate_limit();
         if ( is_wp_error( $rate_error ) ) return $rate_error;
 
         $system = $this->build_section_files_system_prompt();
         $slug_hint = $slug ? "Suggested slug: {$slug}\n\n" : '';
-        $user = "Convert this HTML into a FramePress section.\n\n"
+        $user = "Convert this HTML into a HERO section.\n\n"
               . $slug_hint
               . "HTML:\n```html\n{$html}\n```\n\n"
               . "Identify all variable parts (text, images, colours, links) and turn them into schema settings. "
@@ -359,7 +359,7 @@ class FramePress_AI_Service {
      */
     public function fix_section_files( array $files, string $error ): array|\WP_Error {
         if ( ! $this->is_available() ) {
-            return new \WP_Error( 'ai_disabled', __( 'AI is not configured.', 'framepress' ) );
+            return new \WP_Error( 'ai_disabled', __( 'AI is not configured.', 'hero' ) );
         }
         $rate_error = $this->check_rate_limit();
         if ( is_wp_error( $rate_error ) ) return $rate_error;
@@ -374,7 +374,7 @@ class FramePress_AI_Service {
         $label       = $files['label']       ?? '';
 
         $user = <<<MSG
-The following FramePress section files failed PHP syntax validation with this error:
+The following HERO section files failed PHP syntax validation with this error:
 
 ERROR: {$error}
 
@@ -425,15 +425,15 @@ MSG;
     public function install_section_files( string $slug, string $schema_php, string $section_php, string $style_css, string $script_js = '' ): true|\WP_Error {
         $slug = sanitize_title( $slug );
         if ( empty( $slug ) ) {
-            return new \WP_Error( 'invalid_slug', __( 'Invalid section slug.', 'framepress' ) );
+            return new \WP_Error( 'invalid_slug', __( 'Invalid section slug.', 'hero' ) );
         }
 
         // Safety: PHP files must not be executable from the uploads dir — our
         // .htaccess blocks direct PHP requests, but verify the path is correct.
-        $dir = trailingslashit( wp_upload_dir()['basedir'] ) . 'framepress/sections/' . $slug . '/';
+        $dir = trailingslashit( wp_upload_dir()['basedir'] ) . 'hero/sections/' . $slug . '/';
 
         if ( ! wp_mkdir_p( $dir ) ) {
-            return new \WP_Error( 'mkdir_failed', __( 'Could not create section directory.', 'framepress' ) );
+            return new \WP_Error( 'mkdir_failed', __( 'Could not create section directory.', 'hero' ) );
         }
 
         // Strip any <?php opening tag and leading `return` keyword the AI might have included.
@@ -461,7 +461,7 @@ MSG;
 
         // Validate schema is syntactically safe (no function calls, no includes).
         if ( preg_match( '/\b(include|require|eval|exec|system|passthru|shell_exec|popen|proc_open)\s*[(\s]/i', $schema_php ) ) {
-            return new \WP_Error( 'unsafe_schema', __( 'AI-generated schema contains unsafe PHP constructs.', 'framepress' ) );
+            return new \WP_Error( 'unsafe_schema', __( 'AI-generated schema contains unsafe PHP constructs.', 'hero' ) );
         }
 
         // Validate PHP syntax before writing to disk. token_get_all() with TOKEN_PARSE
@@ -486,10 +486,10 @@ MSG;
         if ( $err ) return $err;
 
         if ( file_put_contents( $dir . 'schema.php', $schema_content ) === false ) {
-            return new \WP_Error( 'write_failed', __( 'Could not write schema.php — check uploads directory permissions.', 'framepress' ) );
+            return new \WP_Error( 'write_failed', __( 'Could not write schema.php — check uploads directory permissions.', 'hero' ) );
         }
         if ( file_put_contents( $dir . 'section.php', $section_content ) === false ) {
-            return new \WP_Error( 'write_failed', __( 'Could not write section.php — check uploads directory permissions.', 'framepress' ) );
+            return new \WP_Error( 'write_failed', __( 'Could not write section.php — check uploads directory permissions.', 'hero' ) );
         }
 
         if ( ! empty( $style_css ) ) {
@@ -501,7 +501,7 @@ MSG;
         }
 
         // Bust registry cache so the new section shows up immediately.
-        delete_transient( 'framepress_section_registry' );
+        delete_transient( 'hero_section_registry' );
 
         return true;
     }
@@ -512,7 +512,7 @@ MSG;
         $required = [ 'slug', 'schema_php', 'section_php' ];
         foreach ( $required as $key ) {
             if ( empty( $data[ $key ] ) ) {
-                return new \WP_Error( 'missing_key', sprintf( __( 'AI response missing required key: %s', 'framepress' ), $key ) );
+                return new \WP_Error( 'missing_key', sprintf( __( 'AI response missing required key: %s', 'hero' ), $key ) );
             }
         }
         return [
@@ -537,8 +537,8 @@ MSG;
 
     private function build_section_files_system_prompt(): string {
         return <<<'PROMPT'
-You are building PHP section files for a WordPress plugin called FramePress.
-FramePress works exactly like Shopify Themes — each section is a folder with two required files:
+You are building PHP section files for a WordPress plugin called HERO.
+HERO works exactly like Shopify Themes — each section is a folder with two required files:
   schema.php   — returns a PHP array describing the section's fields and metadata.
   section.php  — receives $settings, $blocks, $section and outputs HTML.
 
@@ -554,7 +554,7 @@ FramePress works exactly like Shopify Themes — each section is a folder with t
      --fp-color-primary, --fp-color-secondary, --fp-color-text, --fp-color-background
      --fp-section-padding-v, --fp-section-padding-h, --fp-container-width, --fp-gap
      --fp-font-body, --fp-font-heading, --fp-btn-radius
-5. Wrap all section HTML in a single root element — the outer #framepress-section-{id} wrapper is added automatically, do NOT add it yourself.
+5. Wrap all section HTML in a single root element — the outer #hero-section-{id} wrapper is added automatically, do NOT add it yourself.
 6. style.css is optional — include it if the section needs non-trivial CSS. Use the section type as a BEM namespace (e.g. .fp-hero__title). Never use inline <style> tags inside section.php.
 7. All sections must be responsive (mobile-first, CSS Grid or Flexbox).
 8. DO NOT output <?php opening tags — they will be added automatically.
@@ -692,7 +692,7 @@ PROMPT;
         $current   = (int) get_transient( $key );
 
         if ( $current >= 10 ) {
-            return new \WP_Error( 'rate_limited', __( 'Too many AI requests. Please wait a moment and try again.', 'framepress' ) );
+            return new \WP_Error( 'rate_limited', __( 'Too many AI requests. Please wait a moment and try again.', 'hero' ) );
         }
 
         set_transient( $key, $current + 1, MINUTE_IN_SECONDS );

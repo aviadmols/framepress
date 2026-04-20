@@ -8,8 +8,8 @@ wp_enqueue_script( 'wp-theme-plugin-editor' );
 wp_enqueue_style( 'wp-codemirror' );
 ?>
 <script>
-window.framepressSMData = <?php echo wp_json_encode( [
-    'restUrl'    => rest_url( 'framepress/v1' ),
+window.heroSMData = <?php echo wp_json_encode( [
+    'restUrl'    => rest_url( 'hero/v1' ),
     'nonce'      => wp_create_nonce( 'wp_rest' ),
     'cmSettings' => [
         'php' => $cm_php,
@@ -42,6 +42,18 @@ window.framepressSMData = <?php echo wp_json_encode( [
                 <div class="fps-sm-new-actions">
                     <button id="fps-new-section-submit" class="button button-primary">Create</button>
                     <button id="fps-new-section-cancel" class="button">Cancel</button>
+                </div>
+            </div>
+
+            <!-- ── Bulk import ──────────────────────────────────────── -->
+            <div class="fps-sm-bulk-import">
+                <button id="fps-bulk-toggle" class="button fps-sm-bulk-toggle">&#8679; Bulk Import ZIPs</button>
+                <div id="fps-bulk-form" class="fps-sm-bulk-form" hidden>
+                    <input id="fps-bulk-zip" type="file" accept=".zip,application/zip" multiple />
+                    <p class="fps-sm-new-hint">Select multiple ZIP files. Each ZIP must contain <code>schema.php</code> and <code>section.php</code>. Images inside ZIPs are imported to the Media Library.</p>
+                    <p id="fps-bulk-error" class="fps-sm-new-error" hidden></p>
+                    <button id="fps-bulk-submit" class="button button-primary" disabled>Import ZIPs</button>
+                    <ul id="fps-bulk-results" class="fps-sm-bulk-results" hidden></ul>
                 </div>
             </div>
 
@@ -140,6 +152,16 @@ window.framepressSMData = <?php echo wp_json_encode( [
 
 .fps-sm-list { flex: 1; overflow-y: auto; padding-bottom: 12px; }
 .fps-sm-list-loading { padding: 16px 14px; font-size: 13px; color: #777; margin: 0; }
+
+/* ── Bulk import ── */
+.fps-sm-bulk-import { border-bottom: 1px solid #c3c4c7; }
+.fps-sm-bulk-toggle { width: 100%; text-align: left; border-radius: 0 !important; border: none !important; border-bottom: none !important; background: #f0f0f1 !important; font-size: 12px !important; padding: 8px 14px !important; }
+.fps-sm-bulk-form { padding: 10px 14px 12px; background: #fff; display: flex; flex-direction: column; gap: 6px; border-top: 1px solid #c3c4c7; }
+.fps-sm-bulk-form input[type="file"] { font-size: 12px; }
+.fps-sm-bulk-results { list-style: none; margin: 0; padding: 0; max-height: 160px; overflow-y: auto; }
+.fps-sm-bulk-results li { font-size: 12px; padding: 3px 0; }
+.fps-sm-bulk-results li.success { color: #1d7a4a; }
+.fps-sm-bulk-results li.error   { color: #cc1818; }
 
 .fps-sm-group-label {
     padding: 12px 14px 4px;
@@ -311,7 +333,7 @@ window.framepressSMData = <?php echo wp_json_encode( [
 (function () {
     'use strict';
 
-    var DATA = window.framepressSMData || {};
+    var DATA = window.heroSMData || {};
     var REST = (DATA.restUrl || '').replace(/\/$/, '');
     var NONCE = DATA.nonce || '';
     var CM_SETTINGS = DATA.cmSettings || {};
@@ -355,6 +377,12 @@ window.framepressSMData = <?php echo wp_json_encode( [
         newCancel:    document.getElementById('fps-new-section-cancel'),
         newError:     document.getElementById('fps-new-section-error'),
         newZip:       document.getElementById('fps-new-zip'),
+        bulkToggle:   document.getElementById('fps-bulk-toggle'),
+        bulkForm:     document.getElementById('fps-bulk-form'),
+        bulkZip:      document.getElementById('fps-bulk-zip'),
+        bulkSubmit:   document.getElementById('fps-bulk-submit'),
+        bulkResults:  document.getElementById('fps-bulk-results'),
+        bulkError:    document.getElementById('fps-bulk-error'),
     };
 
     // ── API helper ─────────────────────────────────────────────────────────
@@ -728,6 +756,72 @@ window.framepressSMData = <?php echo wp_json_encode( [
         els.newError.textContent = msg;
         els.newError.hidden = false;
     }
+
+    // ── Bulk import ────────────────────────────────────────────────────────
+    els.bulkToggle.addEventListener('click', function () {
+        var hidden = els.bulkForm.hidden;
+        els.bulkForm.hidden = !hidden;
+    });
+
+    els.bulkZip.addEventListener('change', function () {
+        var count = els.bulkZip.files.length;
+        els.bulkSubmit.disabled   = count === 0;
+        els.bulkSubmit.textContent = count > 0 ? 'Import ' + count + ' ZIP' + (count > 1 ? 's' : '') : 'Import ZIPs';
+        els.bulkResults.hidden    = true;
+        els.bulkResults.innerHTML = '';
+        els.bulkError.hidden      = true;
+    });
+
+    els.bulkSubmit.addEventListener('click', async function () {
+        if (!els.bulkZip.files.length) return;
+
+        var fd = new FormData();
+        for (var i = 0; i < els.bulkZip.files.length; i++) {
+            fd.append('section_zips[]', els.bulkZip.files[i]);
+        }
+
+        els.bulkSubmit.disabled   = true;
+        els.bulkSubmit.textContent = 'Importing…';
+        els.bulkResults.hidden    = true;
+        els.bulkResults.innerHTML = '';
+        els.bulkError.hidden      = true;
+
+        try {
+            var url  = REST + '/sections/bulk-upload';
+            var resp = await fetch(url, {
+                method:  'POST',
+                headers: { 'X-WP-Nonce': NONCE },
+                body:    fd,
+            });
+            var json = await resp.json();
+            if (!resp.ok || !json.results) throw new Error(json.error || 'Upload failed');
+
+            json.results.forEach(function (r) {
+                var li = document.createElement('li');
+                if (r.success) {
+                    li.className   = 'success';
+                    li.textContent = '✓ ' + r.slug;
+                } else {
+                    li.className   = 'error';
+                    li.textContent = '✗ ' + r.slug + ' — ' + r.error;
+                }
+                els.bulkResults.appendChild(li);
+            });
+            els.bulkResults.hidden = false;
+
+            var anySuccess = json.results.some(function (r) { return r.success; });
+            if (anySuccess) {
+                await fetchSections();
+            }
+        } catch (e) {
+            els.bulkError.textContent = e.message || 'Bulk upload failed.';
+            els.bulkError.hidden      = false;
+        } finally {
+            els.bulkZip.value         = '';
+            els.bulkSubmit.disabled   = true;
+            els.bulkSubmit.textContent = 'Import ZIPs';
+        }
+    });
 
     // ── Save button ────────────────────────────────────────────────────────
     els.saveBtn.addEventListener('click', saveFiles);

@@ -9,14 +9,14 @@ const TABS = [
 
 export default function AISettingsPage() {
     const [ tab, setTab ] = useState( 'generator' );
-    const adminUrl = window.framepressData?.adminUrl || '';
+    const adminUrl = window.heroData?.adminUrl || '';
 
     return (
         <div className="fp-ai-page">
             <div className="fp-ai-page__header">
                 <div className="fp-ai-page__header-left">
-                    <a href={ adminUrl + 'admin.php?page=framepress' } className="fp-ai-page__back">
-                        ← FramePress
+                    <a href={ adminUrl + 'admin.php?page=hero' } className="fp-ai-page__back">
+                        ← HERO
                     </a>
                     <h1 className="fp-ai-page__title">AI Settings</h1>
                 </div>

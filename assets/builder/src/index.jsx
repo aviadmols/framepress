@@ -4,7 +4,7 @@ import { BuilderProvider } from './context/BuilderContext';
 import App from './App';
 import './builder.css';
 
-const root = document.getElementById( 'framepress-builder-root' );
+const root = document.getElementById( 'hero-builder-root' );
 
 if ( root ) {
     createRoot( root ).render(

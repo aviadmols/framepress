@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 
-const REST  = () => window.framepressData?.restUrl || '';
-const NONCE = () => window.framepressData?.nonce   || '';
+const REST  = () => window.heroData?.restUrl || '';
+const NONCE = () => window.heroData?.nonce   || '';
 
 export default function AIProviderSettings() {
     const [ provider, setProvider ] = useState( 'anthropic' );

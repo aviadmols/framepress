@@ -1,6 +1,6 @@
 <?php
 /**
- * FramePress Global Settings
+ * HERO Global Settings
  *
  * Manages sitewide design tokens (colors, typography, spacing, buttons, custom CSS).
  * Settings are stored as JSON in wp_options and output as CSS custom properties
@@ -9,15 +9,15 @@
 
 defined( 'ABSPATH' ) || exit;
 
-class FramePress_Global_Settings {
+class Hero_Global_Settings {
 
-    private const OPTION_KEY   = 'framepress_global_settings';
+    private const OPTION_KEY   = 'hero_global_settings';
     private string $schema_file;
     /** @var list<array{slug:string,label:string,family:string}>|null */
     private static ?array $google_fonts_catalog = null;
 
     public function __construct() {
-        $this->schema_file = FRAMEPRESS_DIR . 'global-settings/schema.php';
+        $this->schema_file = HERO_DIR . 'global-settings/schema.php';
     }
 
     /**
@@ -29,7 +29,7 @@ class FramePress_Global_Settings {
         if ( self::$google_fonts_catalog !== null ) {
             return self::$google_fonts_catalog;
         }
-        $file = FRAMEPRESS_DIR . 'global-settings/google-fonts.php';
+        $file = HERO_DIR . 'global-settings/google-fonts.php';
         if ( ! is_readable( $file ) ) {
             self::$google_fonts_catalog = [];
             return self::$google_fonts_catalog;
@@ -155,7 +155,7 @@ class FramePress_Global_Settings {
     public function output_css_variables(): void {
         $css = $this->build_css_output();
         if ( $css !== '' ) {
-            echo '<style id="framepress-global-css">' . "\n" . $css . "\n</style>\n"; // phpcs:ignore
+            echo '<style id="hero-global-css">' . "\n" . $css . "\n</style>\n"; // phpcs:ignore
         }
     }
 
@@ -184,9 +184,9 @@ class FramePress_Global_Settings {
                         continue;
                     }
                     if ( $id === 'custom_css_header' ) {
-                        $custom_lines[] = '.framepress-header { ' . "\n" . $css_value . "\n" . ' }';
+                        $custom_lines[] = '.hero-header { ' . "\n" . $css_value . "\n" . ' }';
                     } elseif ( $id === 'custom_css_footer' ) {
-                        $custom_lines[] = '.framepress-footer { ' . "\n" . $css_value . "\n" . ' }';
+                        $custom_lines[] = '.hero-footer { ' . "\n" . $css_value . "\n" . ' }';
                     } else {
                         // custom_css_global — no scope wrapper.
                         $custom_lines[] = $css_value;

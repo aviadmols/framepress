@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 
-const REST  = () => window.framepressData?.restUrl || '';
-const NONCE = () => window.framepressData?.nonce   || '';
+const REST  = () => window.heroData?.restUrl || '';
+const NONCE = () => window.heroData?.nonce   || '';
 
 const SOURCE_LABELS = { plugin: 'Core', theme: 'Theme', uploads: 'Custom' };
 const SOURCE_COLORS = { plugin: '#6d7175', theme: '#8a5cf6', uploads: '#2c6ecb' };

@@ -1,6 +1,6 @@
 <?php
 /**
- * FramePress Section Registry
+ * HERO Section Registry
  *
  * Scans three directory paths for file-based sections and caches the results.
  * Scan priority (highest → lowest): uploads > child theme > plugin core.
@@ -9,7 +9,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-class FramePress_Section_Registry {
+class Hero_Section_Registry {
 
     private static ?self $instance = null;
 
@@ -19,7 +19,7 @@ class FramePress_Section_Registry {
     /** @var bool Whether sections have been loaded for this request. */
     private bool $loaded = false;
 
-    private const TRANSIENT_KEY     = 'framepress_section_registry';
+    private const TRANSIENT_KEY     = 'hero_section_registry';
     private const TRANSIENT_EXPIRY  = DAY_IN_SECONDS;
 
     // ── Singleton ─────────────────────────────────────────────────────────────
@@ -136,9 +136,9 @@ class FramePress_Section_Registry {
     private function get_scan_paths(): array {
         $upload_dir = wp_upload_dir();
         return [
-            'plugin'  => FRAMEPRESS_SECTIONS,
-            'theme'   => get_stylesheet_directory() . '/framepress-sections/',
-            'uploads' => trailingslashit( $upload_dir['basedir'] ) . 'framepress/sections/',
+            'plugin'  => HERO_SECTIONS,
+            'theme'   => get_stylesheet_directory() . '/hero-sections/',
+            'uploads' => trailingslashit( $upload_dir['basedir'] ) . 'hero/sections/',
         ];
     }
 
@@ -156,7 +156,7 @@ class FramePress_Section_Registry {
         } catch ( \Throwable $e ) {
             // Malformed schema file — skip silently in production.
             if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-                trigger_error( 'FramePress: failed to load schema ' . $schema_file . ' — ' . $e->getMessage(), E_USER_WARNING );
+                trigger_error( 'HERO: failed to load schema ' . $schema_file . ' — ' . $e->getMessage(), E_USER_WARNING );
             }
             return null;
         }

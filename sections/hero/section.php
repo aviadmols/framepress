@@ -2,7 +2,7 @@
 /**
  * Hero Section — render template.
  *
- * Available variables (injected by FramePress_Section_Renderer):
+ * Available variables (injected by HERO_Section_Renderer):
  *   @var array  $settings  Merged field values.
  *   @var array  $blocks    Prepared block instances.
  *   @var array  $section   [ 'id' => string, 'type' => string, 'source' => string ]

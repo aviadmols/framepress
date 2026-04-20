@@ -1,6 +1,6 @@
 <?php
 /**
- * FramePress Section Assets
+ * HERO Section Assets
  *
  * Discovers and enqueues per-section style.css and script.js files.
  * Only loads assets for section types that are actually used on the current page.
@@ -9,14 +9,14 @@
 
 defined( 'ABSPATH' ) || exit;
 
-class FramePress_Section_Assets {
+class Hero_Section_Assets {
 
-    private FramePress_Section_Registry $registry;
-    private FramePress_Section_Renderer $renderer;
+    private Hero_Section_Registry $registry;
+    private Hero_Section_Renderer $renderer;
 
     public function __construct(
-        FramePress_Section_Registry $registry,
-        FramePress_Section_Renderer $renderer
+        Hero_Section_Registry $registry,
+        Hero_Section_Renderer $renderer
     ) {
         $this->registry = $registry;
         $this->renderer = $renderer;
@@ -28,11 +28,11 @@ class FramePress_Section_Assets {
      */
     public function enqueue_section_assets(): void {
         // Also enqueue the base frontend stylesheet.
-        $base_css = FRAMEPRESS_DIR . 'assets/frontend/framepress.css';
+        $base_css = HERO_DIR . 'assets/frontend/hero.css';
         if ( file_exists( $base_css ) ) {
             wp_enqueue_style(
-                'framepress-frontend',
-                FRAMEPRESS_URL . 'assets/frontend/framepress.css',
+                'hero-frontend',
+                HERO_URL . 'assets/frontend/hero.css',
                 [],
                 filemtime( $base_css )
             );
@@ -54,12 +54,12 @@ class FramePress_Section_Assets {
             return;
         }
 
-        if ( ! wp_style_is( 'framepress-frontend', 'enqueued' ) ) {
-            $base_css = FRAMEPRESS_DIR . 'assets/frontend/framepress.css';
+        if ( ! wp_style_is( 'hero-frontend', 'enqueued' ) ) {
+            $base_css = HERO_DIR . 'assets/frontend/hero.css';
             if ( file_exists( $base_css ) ) {
                 wp_enqueue_style(
-                    'framepress-frontend',
-                    FRAMEPRESS_URL . 'assets/frontend/framepress.css',
+                    'hero-frontend',
+                    HERO_URL . 'assets/frontend/hero.css',
                     [],
                     filemtime( $base_css )
                 );
@@ -72,9 +72,9 @@ class FramePress_Section_Assets {
         $css_file = $section_path . 'style.css';
         if ( file_exists( $css_file ) ) {
             wp_enqueue_style(
-                'framepress-section-' . $type,
+                'hero-section-' . $type,
                 $section_url . 'style.css',
-                [ 'framepress-frontend' ],
+                [ 'hero-frontend' ],
                 (string) filemtime( $css_file )
             );
         }
@@ -82,7 +82,7 @@ class FramePress_Section_Assets {
         $js_file = $section_path . 'script.js';
         if ( file_exists( $js_file ) ) {
             wp_enqueue_script(
-                'framepress-section-' . $type,
+                'hero-section-' . $type,
                 $section_url . 'script.js',
                 [],
                 (string) filemtime( $js_file ),
@@ -110,7 +110,7 @@ class FramePress_Section_Assets {
                 return str_replace( $upload_dir, $upload_url, $path );
 
             default: // 'plugin'
-                return str_replace( FRAMEPRESS_DIR, FRAMEPRESS_URL, $path );
+                return str_replace( HERO_DIR, HERO_URL, $path );
         }
     }
 }

@@ -1,6 +1,6 @@
 <?php
 /**
- * FramePress Block Registry
+ * HERO Block Registry
  *
  * Scans three directory paths for file-based block types and caches results.
  * Mirrors the Section Registry pattern exactly.
@@ -9,7 +9,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-class FramePress_Block_Registry {
+class Hero_Block_Registry {
 
     private static ?self $instance = null;
 
@@ -18,7 +18,7 @@ class FramePress_Block_Registry {
 
     private bool $loaded = false;
 
-    private const TRANSIENT_KEY    = 'framepress_block_registry';
+    private const TRANSIENT_KEY    = 'hero_block_registry';
     private const TRANSIENT_EXPIRY = DAY_IN_SECONDS;
 
     // ── Singleton ─────────────────────────────────────────────────────────────
@@ -109,9 +109,9 @@ class FramePress_Block_Registry {
     private function get_scan_paths(): array {
         $upload_dir = wp_upload_dir();
         return [
-            'plugin'  => FRAMEPRESS_BLOCKS,
-            'theme'   => get_stylesheet_directory() . '/framepress-blocks/',
-            'uploads' => trailingslashit( $upload_dir['basedir'] ) . 'framepress/blocks/',
+            'plugin'  => HERO_BLOCKS,
+            'theme'   => get_stylesheet_directory() . '/hero-blocks/',
+            'uploads' => trailingslashit( $upload_dir['basedir'] ) . 'hero/blocks/',
         ];
     }
 
@@ -124,7 +124,7 @@ class FramePress_Block_Registry {
             $schema = $loader( $schema_file );
         } catch ( \Throwable $e ) {
             if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-                trigger_error( 'FramePress Block Registry: failed to load ' . $schema_file . ' — ' . $e->getMessage(), E_USER_WARNING );
+                trigger_error( 'HERO Block Registry: failed to load ' . $schema_file . ' — ' . $e->getMessage(), E_USER_WARNING );
             }
             return null;
         }

@@ -12,7 +12,7 @@ export default function PreviewIframe() {
     useEffect( () => {
         const onMessage = ( event ) => {
             if ( event.origin !== window.location.origin ) return;
-            if ( event.data?.type === 'FRAMEPRESS_PREVIEW_READY' ) {
+            if ( event.data?.type === 'HERO_PREVIEW_READY' ) {
                 dispatch( { type: 'SET_PREVIEW_READY', ready: true } );
             }
         };
@@ -24,7 +24,7 @@ export default function PreviewIframe() {
     const sendUpdate = useCallback( () => {
         if ( ! iframeRef.current?.contentWindow ) return;
         iframeRef.current.contentWindow.postMessage( {
-            type:           'FRAMEPRESS_UPDATE',
+            type:           'HERO_UPDATE',
             context:        state.context,
             sections:       state.sections,
             globalSettings: state.globalSettings,
@@ -38,7 +38,7 @@ export default function PreviewIframe() {
         return () => clearTimeout( timerRef.current );
     }, [ state.sections, state.globalSettings, state.previewReady ] );
 
-    const previewUrl = window.framepressData?.previewUrl || '';
+    const previewUrl = window.heroData?.previewUrl || '';
 
     const isMobile  = state.previewMode === 'mobile';
     const frameStyle = isMobile
@@ -51,7 +51,7 @@ export default function PreviewIframe() {
                 ref={ iframeRef }
                 src={ previewUrl }
                 style={ frameStyle }
-                title="FramePress Preview"
+                title="HERO Preview"
                 sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
             />
         </div>

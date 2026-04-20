@@ -22,7 +22,7 @@ export default function PreviewToolbar() {
                 </button>
             </div>
             <a
-                href={ window.framepressData?.previewUrl }
+                href={ window.heroData?.previewUrl }
                 target="_blank"
                 rel="noopener noreferrer"
                 className="fp-preview-toolbar__open"
