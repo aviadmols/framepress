@@ -100,6 +100,15 @@ class Hero_Elementor_Section_Widget extends \Elementor\Widget_Base {
             $this->register_field_control( $field );
         }
 
+        $this->add_control( 'fp_edit_code_btn', [
+            'type' => \Elementor\Controls_Manager::RAW_HTML,
+            'raw'  => '<a href="' . esc_url( $this->build_edit_url( $schema['type'] ) ) . '" target="_blank" '
+                . 'style="display:inline-block;margin-top:12px;padding:7px 16px;background:#1e1e2d;color:#fff;'
+                . 'border-radius:5px;font-size:12px;font-weight:600;text-decoration:none;border:1px solid #444;">'
+                . esc_html__( 'Edit Code', 'hero' ) . '</a>',
+            'content_classes' => 'elementor-descriptor',
+        ] );
+
         if ( ! empty( $schema['blocks']['allowed'] ) ) {
             $this->add_control( 'fp_blocks_notice', [
                 'type'            => \Elementor\Controls_Manager::RAW_HTML,
