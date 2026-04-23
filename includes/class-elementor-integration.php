@@ -150,15 +150,20 @@ class Hero_Elementor_Integration {
             return;
         }
 
+        $registry = Hero_Section_Registry::get_instance();
+
         require_once HERO_DIR . 'includes/class-elementor-widget.php';
         require_once HERO_DIR . 'includes/class-elementor-widget-legacy.php';
 
-        $sections = Hero_Section_Registry::get_instance()->get_all_sections();
+        $sections = $registry->get_all_sections();
         Hero_Elementor_Section_Widget::set_schemas( $sections );
 
         foreach ( $sections as $schema ) {
             $type = isset( $schema['type'] ) ? sanitize_key( (string) $schema['type'] ) : '';
             if ( $type === '' ) {
+                continue;
+            }
+            if ( ! $registry->is_section_enabled( $type ) ) {
                 continue;
             }
             $name = 'fp-' . $type;

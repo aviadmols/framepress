@@ -146,6 +146,13 @@ class Hero_Rest_API {
             'permission_callback' => [ $this, 'editor_permission' ],
         ] );
 
+        // Toggle a section enabled/disabled (affects builder/Elementor availability).
+        register_rest_route( self::NS, '/sections-manager/toggle', [
+            'methods'             => 'POST',
+            'callback'            => [ $this, 'toggle_section_enabled' ],
+            'permission_callback' => [ $this, 'editor_permission' ],
+        ] );
+
         // Read / write section files (uploads sections only for writes).
         register_rest_route( self::NS, '/sections-manager/(?P<type>[a-z0-9\-]+)/files', [
             [ 'methods' => 'GET',  'callback' => [ $this, 'get_section_files' ],  'permission_callback' => [ $this, 'editor_permission' ] ],
@@ -764,6 +771,7 @@ class Hero_Rest_API {
      */
     public function sections_manager_list(): \WP_REST_Response {
         $schemas = $this->section_registry->get_all_sections();
+        $disabled_types = $this->section_registry->get_disabled_types();
 
         // Collect usage: pages
         $page_usage = [];
@@ -821,6 +829,7 @@ class Hero_Rest_API {
                 'source'   => $source,
                 'files'    => $files,
                 'usage'    => $usage,
+                'enabled'  => ! in_array( $type, $disabled_types, true ),
                 'editable' => $source === 'uploads',
             ];
         }
@@ -954,6 +963,40 @@ class Hero_Rest_API {
         delete_transient( 'hero_section_registry' );
 
         return rest_ensure_response( [ 'success' => true, 'type' => $slug ] );
+    }
+
+    /**
+     * POST /sections-manager/toggle
+     * Body: { "type": "faq", "enabled": true|false }
+     */
+    public function toggle_section_enabled( \WP_REST_Request $request ): \WP_REST_Response {
+        $body    = $request->get_json_params();
+        $type    = sanitize_title( $body['type'] ?? '' );
+        $enabled = (bool) ( $body['enabled'] ?? false );
+
+        if ( $type === '' ) {
+            return new \WP_REST_Response( [ 'error' => 'type is required.' ], 400 );
+        }
+
+        if ( ! $this->section_registry->get_section( $type ) ) {
+            return new \WP_REST_Response( [ 'error' => 'Section not found.' ], 404 );
+        }
+
+        $disabled = $this->section_registry->get_disabled_types();
+        if ( $enabled ) {
+            $disabled = array_values( array_diff( $disabled, [ $type ] ) );
+        } elseif ( ! in_array( $type, $disabled, true ) ) {
+            $disabled[] = $type;
+        }
+
+        update_option( 'hero_disabled_sections', array_values( array_unique( $disabled ) ) );
+        $this->section_registry->bust_cache();
+
+        return rest_ensure_response( [
+            'success' => true,
+            'type'    => $type,
+            'enabled' => $enabled,
+        ] );
     }
 
     /**

@@ -118,6 +118,68 @@ class Hero_Elementor_Section_Widget extends \Elementor\Widget_Base {
         }
 
         $this->end_controls_section();
+        $this->register_typography_controls();
+    }
+
+    private function register_typography_controls(): void {
+        $this->start_controls_section( 'hero_style_typography', [
+            'label' => __( 'Typography', 'hero' ),
+            'tab'   => \Elementor\Controls_Manager::TAB_STYLE,
+        ] );
+
+        $this->add_control( 'fp_typo_note', [
+            'type'            => \Elementor\Controls_Manager::RAW_HTML,
+            'raw'             => '<p style="margin:0;color:#6d7175;font-size:12px;">'
+                . esc_html__( 'Applies to the section text in preview and frontend. Use responsive controls per device.', 'hero' )
+                . '</p>',
+            'content_classes' => 'elementor-descriptor',
+        ] );
+
+        $this->add_control( 'fp_typo_font_family', [
+            'label'       => __( 'Font Family', 'hero' ),
+            'type'        => \Elementor\Controls_Manager::TEXT,
+            'placeholder' => 'Inter, Arial, sans-serif',
+            'default'     => '',
+        ] );
+
+        $this->add_control( 'fp_typo_font_weight', [
+            'label'   => __( 'Font Weight', 'hero' ),
+            'type'    => \Elementor\Controls_Manager::SELECT,
+            'default' => '',
+            'options' => [
+                ''    => __( 'Default', 'hero' ),
+                '300' => '300',
+                '400' => '400',
+                '500' => '500',
+                '600' => '600',
+                '700' => '700',
+                '800' => '800',
+            ],
+        ] );
+
+        $this->add_responsive_control( 'fp_typo_font_size', [
+            'label'      => __( 'Font Size', 'hero' ),
+            'type'       => \Elementor\Controls_Manager::SLIDER,
+            'size_units' => [ 'px', 'em', 'rem' ],
+            'range'      => [
+                'px'  => [ 'min' => 10, 'max' => 120 ],
+                'em'  => [ 'min' => 0.5, 'max' => 8, 'step' => 0.05 ],
+                'rem' => [ 'min' => 0.5, 'max' => 8, 'step' => 0.05 ],
+            ],
+        ] );
+
+        $this->add_responsive_control( 'fp_typo_line_height', [
+            'label'      => __( 'Line Height', 'hero' ),
+            'type'       => \Elementor\Controls_Manager::SLIDER,
+            'size_units' => [ 'px', 'em', 'rem' ],
+            'range'      => [
+                'px'  => [ 'min' => 10, 'max' => 120 ],
+                'em'  => [ 'min' => 1, 'max' => 5, 'step' => 0.05 ],
+                'rem' => [ 'min' => 1, 'max' => 5, 'step' => 0.05 ],
+            ],
+        ] );
+
+        $this->end_controls_section();
     }
 
     /**
@@ -381,8 +443,119 @@ class Hero_Elementor_Section_Widget extends \Elementor\Widget_Base {
 
         $stored['type']     = $type;
         $stored['settings'] = $settings;
+        $stored['fp_typography'] = $this->extract_typography_settings( $display );
+
+        $custom_css = trim( (string) ( $stored['custom_css'] ?? '' ) );
+        $typo_css   = $this->build_typography_css( $stored['id'], $stored['fp_typography'] );
+        if ( $typo_css !== '' ) {
+            $stored['custom_css'] = $custom_css !== '' ? ( $custom_css . "\n\n" . $typo_css ) : $typo_css;
+        } else {
+            $stored['custom_css'] = $custom_css;
+        }
 
         return $stored;
+    }
+
+    /**
+     * @param array<string, mixed> $display
+     * @return array<string, mixed>
+     */
+    private function extract_typography_settings( array $display ): array {
+        $keys = [
+            'fp_typo_font_family',
+            'fp_typo_font_weight',
+            'fp_typo_font_size',
+            'fp_typo_font_size_tablet',
+            'fp_typo_font_size_mobile',
+            'fp_typo_line_height',
+            'fp_typo_line_height_tablet',
+            'fp_typo_line_height_mobile',
+        ];
+        $out = [];
+        foreach ( $keys as $key ) {
+            if ( array_key_exists( $key, $display ) ) {
+                $out[ $key ] = $display[ $key ];
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * @param array<string, mixed> $typo
+     */
+    private function build_typography_css( string $section_id, array $typo ): string {
+        $selector = '#hero-section-' . sanitize_key( $section_id );
+        $family   = trim( (string) ( $typo['fp_typo_font_family'] ?? '' ) );
+        $family   = preg_replace( '/[^a-zA-Z0-9,\-\s"\']/', '', $family ) ?? '';
+        $weight   = trim( (string) ( $typo['fp_typo_font_weight'] ?? '' ) );
+        $weight   = preg_replace( '/[^0-9]/', '', $weight ) ?? '';
+
+        $desktop_size  = $this->slider_to_css_value( $typo['fp_typo_font_size'] ?? null );
+        $tablet_size   = $this->slider_to_css_value( $typo['fp_typo_font_size_tablet'] ?? null );
+        $mobile_size   = $this->slider_to_css_value( $typo['fp_typo_font_size_mobile'] ?? null );
+        $desktop_lh    = $this->slider_to_css_value( $typo['fp_typo_line_height'] ?? null );
+        $tablet_lh     = $this->slider_to_css_value( $typo['fp_typo_line_height_tablet'] ?? null );
+        $mobile_lh     = $this->slider_to_css_value( $typo['fp_typo_line_height_mobile'] ?? null );
+
+        $base_rules = [];
+        if ( $family !== '' ) {
+            $base_rules[] = 'font-family:' . $family;
+        }
+        if ( $weight !== '' ) {
+            $base_rules[] = 'font-weight:' . $weight;
+        }
+        if ( $desktop_size !== '' ) {
+            $base_rules[] = 'font-size:' . $desktop_size;
+        }
+        if ( $desktop_lh !== '' ) {
+            $base_rules[] = 'line-height:' . $desktop_lh;
+        }
+
+        $css = '';
+        if ( ! empty( $base_rules ) ) {
+            $css .= $selector . ', ' . $selector . ' p, ' . $selector . ' li, ' . $selector . ' a, ' . $selector . ' span'
+                . '{' . implode( ';', $base_rules ) . ';}';
+        }
+        if ( $tablet_size !== '' || $tablet_lh !== '' ) {
+            $tablet_rules = [];
+            if ( $tablet_size !== '' ) {
+                $tablet_rules[] = 'font-size:' . $tablet_size;
+            }
+            if ( $tablet_lh !== '' ) {
+                $tablet_rules[] = 'line-height:' . $tablet_lh;
+            }
+            $css .= '@media (max-width:1024px){'
+                . $selector . ', ' . $selector . ' p, ' . $selector . ' li, ' . $selector . ' a, ' . $selector . ' span'
+                . '{' . implode( ';', $tablet_rules ) . ';}}';
+        }
+        if ( $mobile_size !== '' || $mobile_lh !== '' ) {
+            $mobile_rules = [];
+            if ( $mobile_size !== '' ) {
+                $mobile_rules[] = 'font-size:' . $mobile_size;
+            }
+            if ( $mobile_lh !== '' ) {
+                $mobile_rules[] = 'line-height:' . $mobile_lh;
+            }
+            $css .= '@media (max-width:767px){'
+                . $selector . ', ' . $selector . ' p, ' . $selector . ' li, ' . $selector . ' a, ' . $selector . ' span'
+                . '{' . implode( ';', $mobile_rules ) . ';}}';
+        }
+        return $css;
+    }
+
+    private function slider_to_css_value( mixed $slider ): string {
+        if ( ! is_array( $slider ) || ! array_key_exists( 'size', $slider ) ) {
+            return '';
+        }
+        $size = $slider['size'];
+        if ( ! is_numeric( $size ) ) {
+            return '';
+        }
+        $unit = isset( $slider['unit'] ) ? (string) $slider['unit'] : 'px';
+        if ( $unit === '' ) {
+            return (string) ( 0 + $size );
+        }
+        return (string) ( 0 + $size ) . $unit;
     }
 
     /**

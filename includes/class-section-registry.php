@@ -44,10 +44,40 @@ class Hero_Section_Registry {
     /** Return schemas filtered to a specific context ('page', 'header', 'footer', 'any'). */
     public function get_sections_for_context( string $context ): array {
         $this->maybe_load();
-        return array_filter( $this->sections, function ( array $schema ) use ( $context ) {
+        $disabled = $this->get_disabled_types();
+        return array_filter( $this->sections, function ( array $schema ) use ( $context, $disabled ) {
+            $type = sanitize_key( (string) ( $schema['type'] ?? '' ) );
+            if ( in_array( $type, $disabled, true ) ) {
+                return false;
+            }
             $contexts = $schema['contexts'] ?? [ 'page' ];
             return in_array( $context, $contexts, true ) || in_array( 'any', $contexts, true );
         } );
+    }
+
+    /**
+     * Return section type slugs explicitly disabled in admin.
+     *
+     * @return string[]
+     */
+    public function get_disabled_types(): array {
+        $raw = get_option( 'hero_disabled_sections', [] );
+        if ( is_string( $raw ) ) {
+            $decoded = json_decode( $raw, true );
+            $raw = is_array( $decoded ) ? $decoded : [];
+        }
+        if ( ! is_array( $raw ) ) {
+            return [];
+        }
+        $types = array_map(
+            static fn( mixed $type ): string => sanitize_key( (string) $type ),
+            $raw
+        );
+        return array_values( array_unique( array_filter( $types ) ) );
+    }
+
+    public function is_section_enabled( string $type ): bool {
+        return ! in_array( sanitize_key( $type ), $this->get_disabled_types(), true );
     }
 
     /** Return a single section schema by type slug, or null if not found. */

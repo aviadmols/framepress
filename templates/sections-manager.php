@@ -23,9 +23,7 @@ window.heroSMData = <?php echo wp_json_encode( [
     <h1 class="fps-sm-page-title">Sections</h1>
 
     <div class="fps-sm-layout">
-
-        <!-- ── Left sidebar ────────────────────────────────────────────── -->
-        <aside class="fps-sm-sidebar">
+        <section class="fps-sm-actions-bar">
             <div class="fps-sm-sidebar-header">
                 <button id="fps-new-section-btn" class="button button-primary fps-sm-new-btn">+ New Section</button>
             </div>
@@ -45,7 +43,6 @@ window.heroSMData = <?php echo wp_json_encode( [
                 </div>
             </div>
 
-            <!-- ── Bulk import ──────────────────────────────────────── -->
             <div class="fps-sm-bulk-import">
                 <button id="fps-bulk-toggle" class="button fps-sm-bulk-toggle">&#8679; Bulk Import ZIPs</button>
                 <div id="fps-bulk-form" class="fps-sm-bulk-form" hidden>
@@ -56,13 +53,14 @@ window.heroSMData = <?php echo wp_json_encode( [
                     <ul id="fps-bulk-results" class="fps-sm-bulk-results" hidden></ul>
                 </div>
             </div>
+        </section>
 
+        <section class="fps-sm-table-wrap">
             <div id="fps-section-list" class="fps-sm-list">
                 <p class="fps-sm-list-loading">Loading sections…</p>
             </div>
-        </aside>
+        </section>
 
-        <!-- ── Right editor panel ──────────────────────────────────────── -->
         <main class="fps-sm-editor-panel" id="fps-editor-panel">
 
             <div id="fps-empty-state" class="fps-sm-empty-state">
@@ -101,7 +99,6 @@ window.heroSMData = <?php echo wp_json_encode( [
 
             </div>
         </main>
-
     </div>
 </div>
 
@@ -112,29 +109,22 @@ window.heroSMData = <?php echo wp_json_encode( [
 .fps-sm-page-title { margin-bottom: 16px !important; }
 
 .fps-sm-layout {
-    display: flex;
+    display: grid;
+    grid-template-rows: auto auto minmax(420px, 1fr);
     border: 1px solid #c3c4c7;
     border-radius: 4px;
     overflow: hidden;
     background: #fff;
-    min-height: 680px;
+    min-height: 760px;
 }
 
-/* ── Sidebar ── */
-.fps-sm-sidebar {
-    width: 260px;
-    flex-shrink: 0;
-    border-right: 1px solid #c3c4c7;
-    background: #f6f7f7;
-    display: flex;
-    flex-direction: column;
-    overflow-y: auto;
-}
+/* ── Actions bar + create/import forms ── */
+.fps-sm-actions-bar { border-bottom: 1px solid #c3c4c7; background: #f6f7f7; }
 .fps-sm-sidebar-header {
     padding: 14px 14px 12px;
-    border-bottom: 1px solid #c3c4c7;
+    border-bottom: 1px solid #dcdcde;
 }
-.fps-sm-new-btn { width: 100%; justify-content: center; }
+.fps-sm-new-btn { min-width: 180px; justify-content: center; }
 
 .fps-sm-new-form {
     padding: 12px 14px;
@@ -154,7 +144,7 @@ window.heroSMData = <?php echo wp_json_encode( [
 .fps-sm-list-loading { padding: 16px 14px; font-size: 13px; color: #777; margin: 0; }
 
 /* ── Bulk import ── */
-.fps-sm-bulk-import { border-bottom: 1px solid #c3c4c7; }
+.fps-sm-bulk-import { border-top: 1px solid #dcdcde; }
 .fps-sm-bulk-toggle { width: 100%; text-align: left; border-radius: 0 !important; border: none !important; border-bottom: none !important; background: #f0f0f1 !important; font-size: 12px !important; padding: 8px 14px !important; }
 .fps-sm-bulk-form { padding: 10px 14px 12px; background: #fff; display: flex; flex-direction: column; gap: 6px; border-top: 1px solid #c3c4c7; }
 .fps-sm-bulk-form input[type="file"] { font-size: 12px; }
@@ -163,32 +153,18 @@ window.heroSMData = <?php echo wp_json_encode( [
 .fps-sm-bulk-results li.success { color: #1d7a4a; }
 .fps-sm-bulk-results li.error   { color: #cc1818; }
 
-.fps-sm-group-label {
-    padding: 12px 14px 4px;
-    font-size: 10px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: .07em;
-    color: #8c9196;
-}
-.fps-sm-item {
-    padding: 9px 14px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    font-size: 13px;
-    border-left: 3px solid transparent;
-    transition: background .1s;
-    line-height: 1.3;
-}
-.fps-sm-item:hover { background: #ededee; }
-.fps-sm-item.active {
-    background: #e8f0fe;
-    border-left-color: #2271b1;
-}
-.fps-sm-item-name { flex: 1; font-weight: 500; color: #1d2327; }
-.fps-sm-item-usage { font-size: 11px; color: #8c9196; }
+/* ── Sections table ── */
+.fps-sm-table-wrap { border-bottom: 1px solid #c3c4c7; background: #fff; }
+.fps-sm-list { padding: 0; }
+.fps-sm-table { margin: 0 !important; border: none !important; box-shadow: none !important; }
+.fps-sm-table td, .fps-sm-table th { vertical-align: middle; }
+.fps-sm-row-link { cursor: pointer; color: #2271b1; font-weight: 600; text-decoration: none; }
+.fps-sm-row-link:hover { text-decoration: underline; }
+.fps-sm-row-active td { background: #f0f6fc !important; }
+.fps-sm-cell-type { font-family: 'SFMono-Regular', Consolas, monospace; font-size: 12px; color: #50575e; }
+.fps-sm-usage-count { font-size: 12px; color: #646970; }
+.fps-sm-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #50575e; }
+.fps-sm-toggle input { margin: 0; }
 
 /* Source badges */
 .fps-sm-badge {
@@ -423,39 +399,57 @@ window.heroSMData = <?php echo wp_json_encode( [
     }
 
     function renderSidebar() {
-        var groups = { plugin: [], theme: [], uploads: [] };
+        var sourceLabel = { plugin: 'Plugin', theme: 'Theme', uploads: 'Uploads' };
+        var html = '<table class="wp-list-table widefat striped fps-sm-table"><thead><tr>'
+            + '<th>Name</th><th>Type</th><th>Source</th><th>Used In</th><th>Enabled</th>'
+            + '</tr></thead><tbody>';
+
         state.sections.forEach(function (s) {
             var src = s.source || 'plugin';
-            (groups[src] = groups[src] || []).push(s);
-        });
-        var order = ['uploads', 'theme', 'plugin'];
-        var labels = { plugin: 'Core (Plugin)', theme: 'Theme', uploads: 'Custom (Yours)' };
-
-        var html = '';
-        order.forEach(function (src) {
-            var items = groups[src];
-            if (!items || !items.length) return;
-            html += '<div class="fps-sm-group">';
-            html += '<div class="fps-sm-group-label">' + escHtml(labels[src] || src) + '</div>';
-            items.forEach(function (s) {
-                var active = state.currentType === s.type ? ' active' : '';
-                var usageCount = (s.usage || []).length;
-                var usageTxt = usageCount > 0 ? usageCount + ' use' + (usageCount > 1 ? 's' : '') : '';
-                html += '<div class="fps-sm-item' + active + '" data-type="' + escAttr(s.type) + '">'
-                    + '<span class="fps-sm-item-name">' + escHtml(s.label || s.type) + '</span>'
-                    + '<span class="fps-sm-badge fps-sm-badge--' + escAttr(src) + '">' + escHtml(labels[src] ? src.charAt(0).toUpperCase() + src.slice(1) : src) + '</span>'
-                    + (usageTxt ? '<span class="fps-sm-item-usage">' + escHtml(usageTxt) + '</span>' : '')
-                    + '</div>';
-            });
-            html += '</div>';
+            var usageCount = (s.usage || []).length;
+            var usageTxt = usageCount > 0 ? usageCount + ' use' + (usageCount > 1 ? 's' : '') : '—';
+            var rowClass = state.currentType === s.type ? ' class="fps-sm-row-active"' : '';
+            var enabled = s.enabled !== false;
+            html += '<tr data-type="' + escAttr(s.type) + '"' + rowClass + '>'
+                + '<td><a href="#" class="fps-sm-row-link" data-type="' + escAttr(s.type) + '">' + escHtml(s.label || s.type) + '</a></td>'
+                + '<td class="fps-sm-cell-type">' + escHtml(s.type) + '</td>'
+                + '<td><span class="fps-sm-badge fps-sm-badge--' + escAttr(src) + '">' + escHtml(sourceLabel[src] || src) + '</span></td>'
+                + '<td><span class="fps-sm-usage-count">' + escHtml(usageTxt) + '</span></td>'
+                + '<td><label class="fps-sm-toggle"><input type="checkbox" data-toggle-type="' + escAttr(s.type) + '"' + (enabled ? ' checked' : '') + '> ' + (enabled ? 'On' : 'Off') + '</label></td>'
+                + '</tr>';
         });
 
-        if (!html) html = '<p class="fps-sm-list-loading">No sections found.</p>';
+        html += '</tbody></table>';
+        if (!state.sections.length) html = '<p class="fps-sm-list-loading">No sections found.</p>';
         els.list.innerHTML = html;
 
-        els.list.querySelectorAll('.fps-sm-item').forEach(function (el) {
-            el.addEventListener('click', function () {
+        els.list.querySelectorAll('.fps-sm-row-link').forEach(function (el) {
+            el.addEventListener('click', function (event) {
+                event.preventDefault();
                 selectSection(this.dataset.type);
+            });
+        });
+
+        els.list.querySelectorAll('[data-toggle-type]').forEach(function (el) {
+            el.addEventListener('change', async function (event) {
+                event.stopPropagation();
+                var type = this.dataset.toggleType;
+                var enabled = !!this.checked;
+                this.disabled = true;
+                try {
+                    await apiFetch('/sections-manager/toggle', {
+                        method: 'POST',
+                        body: JSON.stringify({ type: type, enabled: enabled }),
+                    });
+                    var section = state.sections.find(function (s) { return s.type === type; });
+                    if (section) section.enabled = enabled;
+                    renderSidebar();
+                } catch (e) {
+                    this.checked = !enabled;
+                    alert('Failed to update section state: ' + e.message);
+                } finally {
+                    this.disabled = false;
+                }
             });
         });
     }
@@ -680,11 +674,11 @@ window.heroSMData = <?php echo wp_json_encode( [
         }
     }
 
-    // ── Active sidebar item ────────────────────────────────────────────────
+    // ── Active row item ────────────────────────────────────────────────────
     function markActive(type) {
-        var items = els.list.querySelectorAll('.fps-sm-item');
+        var items = els.list.querySelectorAll('tbody tr[data-type]');
         items.forEach(function (el) {
-            el.classList.toggle('active', el.dataset.type === type);
+            el.classList.toggle('fps-sm-row-active', el.dataset.type === type);
         });
     }
 
