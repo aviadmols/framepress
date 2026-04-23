@@ -152,6 +152,7 @@ class Hero_Section_Registry {
                 $schema['_path']   = trailingslashit( $dir );
                 $schema['_source'] = $source;   // 'plugin' | 'theme' | 'uploads'
                 $schema['source']  = $source;   // exposed to REST API
+                $schema = $this->normalize_image_defaults_for_source( $schema );
 
                 $type = $schema['type'];
                 $this->sections[ $type ] = $schema;
@@ -292,5 +293,81 @@ class Hero_Section_Registry {
         }
 
         return $out;
+    }
+
+    /**
+     * Runtime fallback: for uploads sections, convert relative image defaults
+     * (media/...) to absolute uploads URLs so editor previews resolve on first load.
+     *
+     * @param array<string,mixed> $schema
+     * @return array<string,mixed>
+     */
+    private function normalize_image_defaults_for_source( array $schema ): array {
+        if ( (string) ( $schema['_source'] ?? '' ) !== 'uploads' ) {
+            return $schema;
+        }
+
+        $path = (string) ( $schema['_path'] ?? '' );
+        $type = sanitize_key( (string) ( $schema['type'] ?? '' ) );
+        if ( $path === '' || $type === '' ) {
+            return $schema;
+        }
+
+        $upload = wp_upload_dir();
+        $base_url = trailingslashit( $upload['baseurl'] ) . 'hero/sections/' . $type . '/';
+
+        if ( isset( $schema['settings'] ) && is_array( $schema['settings'] ) ) {
+            foreach ( $schema['settings'] as $idx => $field ) {
+                if ( ! is_array( $field ) ) {
+                    continue;
+                }
+                $schema['settings'][ $idx ] = $this->normalize_image_default_field( $field, $base_url );
+            }
+        }
+
+        if ( isset( $schema['block_types'] ) && is_array( $schema['block_types'] ) ) {
+            foreach ( $schema['block_types'] as $block_type => $block_schema ) {
+                if ( ! is_array( $block_schema ) ) {
+                    continue;
+                }
+                if ( isset( $block_schema['settings'] ) && is_array( $block_schema['settings'] ) ) {
+                    foreach ( $block_schema['settings'] as $idx => $field ) {
+                        if ( ! is_array( $field ) ) {
+                            continue;
+                        }
+                        $block_schema['settings'][ $idx ] = $this->normalize_image_default_field( $field, $base_url );
+                    }
+                }
+                $schema['block_types'][ $block_type ] = $block_schema;
+            }
+        }
+
+        return $schema;
+    }
+
+    /**
+     * @param array<string,mixed> $field
+     * @return array<string,mixed>
+     */
+    private function normalize_image_default_field( array $field, string $base_url ): array {
+        $is_image = (string) ( $field['type'] ?? '' ) === 'image';
+        $default  = (string) ( $field['default'] ?? '' );
+        if ( ! $is_image || $default === '' ) {
+            return $field;
+        }
+        if ( preg_match( '#^https?://#i', $default ) ) {
+            return $field;
+        }
+
+        $normalized = ltrim( $default, '/' );
+        if ( str_starts_with( $normalized, './' ) ) {
+            $normalized = substr( $normalized, 2 );
+        }
+        if ( ! str_starts_with( $normalized, 'media/' ) ) {
+            $normalized = 'media/' . $normalized;
+        }
+
+        $field['default'] = $base_url . $normalized;
+        return $field;
     }
 }

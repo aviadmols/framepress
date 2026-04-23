@@ -56,11 +56,14 @@ export function builderReducer( state, action ) {
         // ── Section CRUD ──────────────────────────────────────────────────────
 
         case 'ADD_SECTION': {
+            const sectionSchema  = state.schemas.find( s => s.type === action.sectionType );
+            const defaultBlocks  = action.blocks
+                ?? ( sectionSchema?.default_blocks || [] ).map( b => ( { ...b, id: generateId() } ) );
             const newSection = {
                 id:         generateId(),
                 type:       action.sectionType,
                 settings:   action.settings || {},
-                blocks:     action.blocks   || [],
+                blocks:     defaultBlocks,
                 custom_css: '',
                 enabled:    true,
             };

@@ -159,6 +159,20 @@ class Hero_Rest_API {
             [ 'methods' => 'POST', 'callback' => [ $this, 'save_section_files' ], 'permission_callback' => [ $this, 'editor_permission' ] ],
         ] );
 
+        // Draft preview (unsaved section.php / style.css) for the file editor iframe.
+        register_rest_route( self::NS, '/sections-manager/(?P<type>[a-z0-9\-]+)/draft-preview', [
+            'methods'             => 'POST',
+            'callback'            => [ $this, 'draft_section_preview' ],
+            'permission_callback' => [ $this, 'editor_permission' ],
+        ] );
+
+        // AI assist: edit section files in place (scoped to path for this type only).
+        register_rest_route( self::NS, '/sections-manager/(?P<type>[a-z0-9\-]+)/ai-assist', [
+            'methods'             => 'POST',
+            'callback'            => [ $this, 'section_files_ai_assist' ],
+            'permission_callback' => [ $this, 'editor_permission' ],
+        ] );
+
         // ── AI endpoints ──────────────────────────────────────────────────────
         register_rest_route( self::NS, '/ai/generate-section', [
             'methods'             => 'POST',
@@ -518,8 +532,11 @@ class Hero_Rest_API {
             return new \WP_REST_Response( [ 'error' => 'Invalid slug' ], 400 );
         }
 
+        $overwrite = $request->get_param( 'overwrite' );
+        $overwrite = $overwrite === null ? true : (bool) $overwrite;
+
         $manager = new Hero_Section_Zip_Manager();
-        $result  = $manager->install_from_zip( $files['section_zip']['tmp_name'], $slug );
+        $result  = $manager->install_from_zip( $files['section_zip']['tmp_name'], $slug, $overwrite );
 
         if ( is_wp_error( $result ) ) {
             return new \WP_REST_Response( [ 'error' => $result->get_error_message() ], 422 );
@@ -536,6 +553,9 @@ class Hero_Rest_API {
             return new \WP_REST_Response( [ 'error' => 'No files uploaded' ], 400 );
         }
 
+        $overwrite = $request->get_param( 'overwrite' );
+        $overwrite = $overwrite === null ? true : (bool) $overwrite;
+
         $manager = new Hero_Section_Zip_Manager();
         $results = [];
 
@@ -551,7 +571,7 @@ class Hero_Rest_API {
             }
 
             $slug   = sanitize_title( pathinfo( $name, PATHINFO_FILENAME ) );
-            $result = $manager->install_from_zip( $tmp_name, $slug );
+            $result = $manager->install_from_zip( $tmp_name, $slug, $overwrite );
 
             if ( is_wp_error( $result ) ) {
                 $results[] = [ 'slug' => $slug, 'error' => $result->get_error_message() ];
@@ -1019,11 +1039,14 @@ class Hero_Rest_API {
             }
         }
 
+        $ai = new Hero_AI_Service();
+
         return rest_ensure_response( [
-            'type'     => $type,
-            'source'   => $schema['source'] ?? 'plugin',
-            'editable' => ( $schema['source'] ?? '' ) === 'uploads',
-            'files'    => $files,
+            'type'                  => $type,
+            'source'                => $schema['source'] ?? 'plugin',
+            'editable'              => ( $schema['source'] ?? '' ) === 'uploads',
+            'files'                 => $files,
+            'ai_assist_available'   => $ai->is_configured(),
         ] );
     }
 
@@ -1058,8 +1081,8 @@ class Hero_Rest_API {
                 } catch ( \ParseError $e ) {
                     return new \WP_REST_Response( [ 'error' => "Syntax error in $filename: " . $e->getMessage() ], 400 );
                 }
-                // Block unsafe constructs in schema.php.
-                if ( $filename === 'schema.php' && preg_match( '/\b(include|require|eval|exec|system|passthru|shell_exec)\s*[(\s]/i', $content ) ) {
+                // Block unsafe constructs in schema.php (tokenizer — not raw regex, avoids false positives in labels).
+                if ( $filename === 'schema.php' && hero_is_schema_php_unsafe( $content ) ) {
                     return new \WP_REST_Response( [ 'error' => 'schema.php contains unsafe PHP constructs.' ], 400 );
                 }
             }
@@ -1075,6 +1098,137 @@ class Hero_Rest_API {
         }
 
         return rest_ensure_response( [ 'success' => true ] );
+    }
+
+    /**
+     * POST /sections-manager/{type}/draft-preview
+     * Renders section.php from the request body + scoped style.css for the file editor live preview.
+     */
+    public function draft_section_preview( \WP_REST_Request $request ): \WP_REST_Response {
+        $type = sanitize_title( $request->get_param( 'type' ) );
+        if ( $type === '' ) {
+            return new \WP_REST_Response( [ 'error' => 'type is required' ], 400 );
+        }
+
+        $schema = $this->section_registry->get_section( $type );
+        if ( ! $schema ) {
+            return new \WP_REST_Response( [ 'error' => 'Section not found' ], 404 );
+        }
+
+        $body         = $request->get_json_params();
+        $section_php  = isset( $body['section_php'] ) ? (string) $body['section_php'] : null;
+        $style_css    = isset( $body['style_css'] ) ? (string) $body['style_css'] : null;
+        $path         = trailingslashit( $schema['_path'] );
+
+        if ( $section_php === null && is_file( $path . 'section.php' ) ) {
+            $section_php = (string) file_get_contents( $path . 'section.php' );
+        }
+        if ( $section_php === null ) {
+            $section_php = '';
+        }
+
+        if ( $style_css === null && is_file( $path . 'style.css' ) ) {
+            $style_css = (string) file_get_contents( $path . 'style.css' );
+        }
+        if ( $style_css === null ) {
+            $style_css = '';
+        }
+
+        $preview_id = 'fp-sm-live';
+        $instance   = [
+            'id'         => $preview_id,
+            'type'       => $type,
+            'settings'   => is_array( $body['settings'] ?? null ) ? $body['settings'] : [],
+            'blocks'     => is_array( $body['blocks'] ?? null ) ? $body['blocks'] : [],
+            'enabled'    => true,
+            'custom_css' => '',
+        ];
+
+        try {
+            $html = $this->renderer->render_draft_from_section_php( $type, $section_php, $instance );
+        } catch ( \Throwable $e ) {
+            return new \WP_REST_Response(
+                [ 'error' => $e->getMessage(), 'html' => '', 'css' => '', 'section_id' => $preview_id ],
+                500
+            );
+        }
+
+        $scoped = $this->renderer->scope_css( $style_css, $preview_id );
+
+        return rest_ensure_response(
+            [
+                'html'       => $html,
+                'css'        => $scoped,
+                'section_id' => $preview_id,
+            ]
+        );
+    }
+
+    /**
+     * POST /sections-manager/{type}/ai-assist
+     * AI edit scoped to this section’s files only (type from URL).
+     */
+    public function section_files_ai_assist( \WP_REST_Request $request ): \WP_REST_Response {
+        $type = sanitize_title( $request->get_param( 'type' ) );
+        if ( $type === '' ) {
+            return new \WP_REST_Response( [ 'error' => 'type is required' ], 400 );
+        }
+
+        $schema = $this->section_registry->get_section( $type );
+        if ( ! $schema ) {
+            return new \WP_REST_Response( [ 'error' => 'Section not found' ], 404 );
+        }
+
+        $body        = $request->get_json_params() ?: [];
+        $instruction = isset( $body['instruction'] ) ? trim( (string) $body['instruction'] ) : '';
+        if ( $instruction === '' ) {
+            return new \WP_REST_Response( [ 'error' => 'instruction is required' ], 400 );
+        }
+        if ( strlen( $instruction ) > 8000 ) {
+            $instruction = substr( $instruction, 0, 8000 );
+        }
+
+        $path    = trailingslashit( $schema['_path'] );
+        $allowed = [ 'schema.php', 'section.php', 'style.css', 'script.js' ];
+        $current = [];
+        foreach ( $allowed as $f ) {
+            $full = $path . $f;
+            if ( is_file( $full ) ) {
+                $current[ $f ] = (string) file_get_contents( $full );
+            }
+        }
+        if ( is_array( $body['files'] ?? null ) ) {
+            foreach ( $allowed as $f ) {
+                if ( array_key_exists( $f, $body['files'] ) && is_string( $body['files'][ $f ] ) ) {
+                    $current[ $f ] = $body['files'][ $f ];
+                }
+            }
+        }
+        if ( $current === [] ) {
+            return new \WP_REST_Response( [ 'error' => 'No files to edit' ], 400 );
+        }
+
+        $ai     = new Hero_AI_Service();
+        $result = $ai->assist_edit_section_files( $type, $instruction, $current );
+        if ( is_wp_error( $result ) ) {
+            $code   = $result->get_error_code();
+            $status = in_array( $code, [ 'ai_disabled', 'rate_limited' ], true ) ? 503 : 400;
+            return new \WP_REST_Response(
+                [
+                    'error' => $result->get_error_message(),
+                    'code'  => $code,
+                ],
+                $status
+            );
+        }
+
+        return rest_ensure_response(
+            [
+                'success' => true,
+                'files'   => $result['files'],
+                'brief'   => $result['brief'] ?? '',
+            ]
+        );
     }
 
     // ─── Sanitisation helpers ─────────────────────────────────────────────────

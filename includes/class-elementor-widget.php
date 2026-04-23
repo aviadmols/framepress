@@ -547,8 +547,7 @@ class Hero_Elementor_Section_Widget extends \Elementor\Widget_Base {
         return admin_url(
             add_query_arg(
                 [
-                    'page' => 'hero-sections-mgr',
-                    // sections-manager.php reads `?type=` and auto-opens that section files.
+                    'page' => 'hero-section-files',
                     'type' => sanitize_key( $section_type ),
                 ],
                 'admin.php'

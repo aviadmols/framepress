@@ -79,6 +79,77 @@ class Hero_Section_Renderer {
     }
 
     /**
+     * Render a section from raw section.php source (editor draft) using the registered schema.
+     * Writes a temp file, includes it, then deletes the file.
+     *
+     * @param array $instance_for_preview Keys: id, settings, blocks, enabled, custom_css (optional).
+     */
+    public function render_draft_from_section_php( string $type, string $section_php, array $instance_for_preview ): string {
+        $schema = $this->section_registry->get_section( $type );
+        if ( ! $schema ) {
+            return '';
+        }
+        $trimmed = trim( $section_php );
+        if ( $trimmed === '' ) {
+            return '';
+        }
+
+        $section_id = isset( $instance_for_preview['id'] ) && is_string( $instance_for_preview['id'] ) && $instance_for_preview['id'] !== ''
+            ? preg_replace( '/[^a-zA-Z0-9_\-]/', '', $instance_for_preview['id'] )
+            : 'fp-sm-live';
+        if ( $section_id === '' ) {
+            $section_id = 'fp-sm-live';
+        }
+
+        $settings = $this->merge_defaults( $schema['settings'] ?? [], $instance_for_preview['settings'] ?? [] );
+        $blocks   = $this->prepare_blocks( $instance_for_preview['blocks'] ?? [], $schema );
+        $section  = [
+            'id'     => $section_id,
+            'type'   => $type,
+            'source' => $schema['source'] ?? 'plugin',
+        ];
+
+        $upload = wp_upload_dir();
+        if ( $upload['error'] ) {
+            $dir = trailingslashit( sys_get_temp_dir() );
+        } else {
+            $dir = trailingslashit( $upload['basedir'] ) . 'hero/section-draft-preview/' . (string) get_current_user_id() . '/';
+        }
+        if ( ! wp_mkdir_p( $dir ) ) {
+            $dir = trailingslashit( sys_get_temp_dir() );
+        }
+
+        $tmp = $dir . 'draft-' . wp_hash( (string) microtime( true ) . $trimmed . (string) wp_rand() ) . '.php';
+        if ( ! file_put_contents( $tmp, $section_php ) ) {
+            return '';
+        }
+
+        try {
+            $html = $this->load_template( $tmp, $settings, $blocks, $section );
+        } finally {
+            if ( is_file( $tmp ) ) {
+                unlink( $tmp );
+            }
+        }
+
+        $wrapper_class = 'hero-section hero-section--' . esc_attr( $type );
+        $output        = sprintf(
+            '<div id="hero-section-%s" class="%s">',
+            esc_attr( $section_id ),
+            $wrapper_class
+        );
+
+        $custom_css = trim( (string) ( $instance_for_preview['custom_css'] ?? '' ) );
+        if ( $custom_css !== '' ) {
+            $output .= '<style>' . $this->scope_css( $custom_css, $section_id ) . '</style>';
+        }
+        $output .= $html;
+        $output .= '</div>';
+
+        return $output;
+    }
+
+    /**
      * Render an ordered list of section instances.
      */
     public function render_sections( array $instances ): string {

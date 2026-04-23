@@ -9,9 +9,10 @@ wp_enqueue_style( 'wp-codemirror' );
 ?>
 <script>
 window.heroSMData = <?php echo wp_json_encode( [
-    'restUrl'    => rest_url( 'hero/v1' ),
-    'nonce'      => wp_create_nonce( 'wp_rest' ),
-    'cmSettings' => [
+    'restUrl'          => rest_url( 'hero/v1' ),
+    'nonce'            => wp_create_nonce( 'wp_rest' ),
+    'sectionEditorUrl' => admin_url( 'admin.php?page=hero-section-files' ),
+    'cmSettings'       => [
         'php' => $cm_php,
         'css' => $cm_css,
         'js'  => $cm_js,
@@ -368,7 +369,7 @@ window.heroSMData = <?php echo wp_json_encode( [
         opts.headers['Content-Type'] = 'application/json';
         opts.credentials = 'same-origin';
         var res = await fetch(REST + path, opts);
-        var data = await res.json().catch(function () { return {}; });
+        var data = await parseJsonResponse(res);
         if (!res.ok) throw new Error(data.error || data.message || res.statusText);
         return data;
     }
@@ -381,9 +382,23 @@ window.heroSMData = <?php echo wp_json_encode( [
             credentials: 'same-origin',
             body:        formData,
         });
-        var data = await res.json().catch(function () { return {}; });
+        var data = await parseJsonResponse(res);
         if (!res.ok) throw new Error(data.error || data.message || res.statusText);
         return data;
+    }
+
+    /**
+     * Parse REST JSON safely, including accidental UTF-8 BOM at response start.
+     */
+    async function parseJsonResponse(res) {
+        var text = await res.text();
+        text = String(text || '').replace(/^\uFEFF+/, '').trim();
+        if (!text) return {};
+        try {
+            return JSON.parse(text);
+        } catch (err) {
+            return { error: 'Invalid JSON response: ' + err.message };
+        }
     }
 
     // ── Fetch + render section list ────────────────────────────────────────
@@ -426,7 +441,14 @@ window.heroSMData = <?php echo wp_json_encode( [
         els.list.querySelectorAll('.fps-sm-row-link').forEach(function (el) {
             el.addEventListener('click', function (event) {
                 event.preventDefault();
-                selectSection(this.dataset.type);
+                var t = this.dataset.type;
+                if (hasDirty() && state.currentType) {
+                    if (!confirm('You have unsaved changes. Leave this page?')) return;
+                }
+                var base = DATA.sectionEditorUrl || '';
+                if (!base) { selectSection(t); return; }
+                var sep = base.indexOf('?') >= 0 ? '&' : '?';
+                window.location.href = base + sep + 'type=' + encodeURIComponent(t);
             });
         });
 
@@ -769,10 +791,8 @@ window.heroSMData = <?php echo wp_json_encode( [
     els.bulkSubmit.addEventListener('click', async function () {
         if (!els.bulkZip.files.length) return;
 
-        var fd = new FormData();
-        for (var i = 0; i < els.bulkZip.files.length; i++) {
-            fd.append('section_zips[]', els.bulkZip.files[i]);
-        }
+        var files = Array.prototype.slice.call(els.bulkZip.files);
+        var total = files.length;
 
         els.bulkSubmit.disabled   = true;
         els.bulkSubmit.textContent = 'Importing…';
@@ -781,32 +801,40 @@ window.heroSMData = <?php echo wp_json_encode( [
         els.bulkError.hidden      = true;
 
         try {
-            var url  = REST + '/sections/bulk-upload';
-            var resp = await fetch(url, {
-                method:  'POST',
-                headers: { 'X-WP-Nonce': NONCE },
-                body:    fd,
-            });
-            var json = await resp.json();
-            if (!resp.ok || !json.results) throw new Error(json.error || 'Upload failed');
+            // Upload sequentially to handle very large file counts safely
+            // (avoids PHP max_file_uploads limits in a single multipart request).
+            for (var i = 0; i < total; i++) {
+                var file = files[i];
+                var fd = new FormData();
+                fd.append('section_zip', file);
+                fd.append('slug', file.name.replace(/\.zip$/i, '').toLowerCase().replace(/[^a-z0-9\-]+/g, '-'));
+                fd.append('overwrite', '1');
 
-            json.results.forEach(function (r) {
+                var result;
+                try {
+                    var up = await apiUpload('/sections/upload', fd);
+                    result = { slug: up.slug || file.name, success: true };
+                } catch (err) {
+                    result = {
+                        slug: file.name.replace(/\.zip$/i, ''),
+                        success: false,
+                        error: err.message || 'Upload failed'
+                    };
+                }
+
                 var li = document.createElement('li');
-                if (r.success) {
+                if (result.success) {
                     li.className   = 'success';
-                    li.textContent = '✓ ' + r.slug;
+                    li.textContent = '✓ ' + result.slug;
                 } else {
                     li.className   = 'error';
-                    li.textContent = '✗ ' + r.slug + ' — ' + r.error;
+                    li.textContent = '✗ ' + result.slug + ' — ' + result.error;
                 }
                 els.bulkResults.appendChild(li);
-            });
-            els.bulkResults.hidden = false;
-
-            var anySuccess = json.results.some(function (r) { return r.success; });
-            if (anySuccess) {
-                await fetchSections();
+                els.bulkSubmit.textContent = 'Importing… (' + (i + 1) + '/' + total + ')';
             }
+            els.bulkResults.hidden = false;
+            await fetchSections();
         } catch (e) {
             els.bulkError.textContent = e.message || 'Bulk upload failed.';
             els.bulkError.hidden      = false;

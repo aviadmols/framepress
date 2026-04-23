@@ -413,6 +413,149 @@ MSG;
     }
 
     /**
+     * Edit section files from a user instruction, scoped to one section. Returns full merged file map.
+     *
+     * @param string $section_type  Section type slug (prompt scope only; registry path is not taken from AI).
+     * @param string $instruction   User request (e.g. change spacing, add field).
+     * @param array  $current_files File name (schema.php, …) => file contents. Only these keys are considered.
+     * @return array{ files: array<string, string>, brief: string }|\WP_Error
+     */
+    public function assist_edit_section_files( string $section_type, string $instruction, array $current_files ): array|\WP_Error {
+        if ( ! $this->is_available() ) {
+            return new \WP_Error( 'ai_disabled', __( 'AI is not configured. Please add an API key in HERO → AI Settings.', 'hero' ) );
+        }
+        $rate_error = $this->check_rate_limit();
+        if ( is_wp_error( $rate_error ) ) {
+            return $rate_error;
+        }
+
+        $section_type = sanitize_title( $section_type );
+        $allowed      = [ 'schema.php', 'section.php', 'style.css', 'script.js' ];
+        $baseline     = [];
+        foreach ( $allowed as $f ) {
+            if ( array_key_exists( $f, $current_files ) && is_string( $current_files[ $f ] ) ) {
+                $baseline[ $f ] = $current_files[ $f ];
+            }
+        }
+        if ( $baseline === [] ) {
+            return new \WP_Error( 'no_files', __( 'No section files to edit.', 'hero' ) );
+        }
+
+        $system = $this->build_section_files_system_prompt()
+            . "\n\n--- SECTION FILE EDIT (IN-PLACE) ---\n"
+            . "The user is editing ONE HERO section only: type slug `{$section_type}`.\n"
+            . "You MUST NOT reference other section types, paths on disk, or any files outside: schema.php, section.php, style.css, script.js for this section.\n"
+            . "Return ONLY valid JSON with:\n"
+            . '  "files" — object whose keys are only: "schema.php", "section.php", "style.css", "script.js" (include only files you changed, or all four if needed).' . "\n"
+            . '  "brief" — one short sentence describing what you changed (optional).' . "\n"
+            . "Respect the same HERO rules as in the system prompt. Keep slug/type inside schema in sync with this section. Do not output markdown — JSON only.";
+
+        $file_blocks = '';
+        foreach ( $baseline as $name => $content ) {
+            $lines = ( $name === 'section.php' || $name === 'schema.php' ) ? 'php' : ( $name === 'style.css' ? 'css' : 'js' );
+            $file_blocks .= "\n### {$name}\n```{$lines}\n{$content}\n```\n";
+        }
+        $user = "Section type: `{$section_type}`\n\nUser request:\n{$instruction}\n\nCurrent files:{$file_blocks}\n"
+            . 'Return JSON: { "files": { "file.php": "full new content" }, "brief": "…" }';
+
+        $parsed = $this->call_api( $system, $user );
+        if ( is_wp_error( $parsed ) ) {
+            return $parsed;
+        }
+        if ( ! isset( $parsed['files'] ) || ! is_array( $parsed['files'] ) ) {
+            return new \WP_Error( 'invalid_ai_response', __( 'AI response did not include a "files" object.', 'hero' ) );
+        }
+        $delta = $this->normalize_assist_file_keys( $parsed['files'] );
+        $merged = $baseline;
+        $n      = 0;
+        foreach ( $allowed as $f ) {
+            if ( ! array_key_exists( $f, $delta ) ) {
+                continue;
+            }
+            if ( ! is_string( $delta[ $f ] ) ) {
+                return new \WP_Error( 'invalid_ai_response', sprintf( /* translators: %s: file name */ __( 'Invalid content for file: %s', 'hero' ), $f ) );
+            }
+            $merged[ $f ] = $delta[ $f ];
+            $n++;
+        }
+        if ( $n === 0 ) {
+            return new \WP_Error( 'no_changes', __( 'The AI did not return any updated files.', 'hero' ) );
+        }
+
+        $valid = $this->validate_assist_merged_files( $merged );
+        if ( is_wp_error( $valid ) ) {
+            return $valid;
+        }
+
+        $brief = is_string( $parsed['brief'] ?? null ) ? trim( (string) $parsed['brief'] ) : '';
+        if ( $brief !== '' && strlen( $brief ) > 2000 ) {
+            $brief = substr( $brief, 0, 2000 ) . '…';
+        }
+
+        return [
+            'files' => $merged,
+            'brief' => $brief,
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $raw From AI: may use "schema_php" or "schema.php" keys.
+     *
+     * @return array<string, string>
+     */
+    private function normalize_assist_file_keys( array $raw ): array {
+        $map = [
+            'schema_php'  => 'schema.php',
+            'section_php' => 'section.php',
+            'style_css'   => 'style.css',
+            'script_js'   => 'script.js',
+        ];
+        $out = [];
+        foreach ( $raw as $k => $v ) {
+            if ( is_string( $k ) && isset( $map[ $k ] ) ) {
+                $out[ $map[ $k ] ] = is_string( $v ) ? $v : '';
+            } else {
+                $out[ (string) $k ] = is_string( $v ) ? $v : ( is_scalar( $v ) ? (string) $v : '' );
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * @param array<string, string> $files
+     */
+    private function validate_assist_merged_files( array $files ): true|\WP_Error {
+        $allowed = [ 'schema.php', 'section.php', 'style.css', 'script.js' ];
+        foreach ( $files as $filename => $content ) {
+            if ( ! in_array( $filename, $allowed, true ) ) {
+                continue;
+            }
+            if ( ! is_string( $content ) ) {
+                return new \WP_Error( 'invalid_file', sprintf( /* translators: %s: file name */ __( 'Invalid content for: %s', 'hero' ), $filename ) );
+            }
+            if ( substr( $filename, -4 ) === '.php' ) {
+                try {
+                    token_get_all( $content, TOKEN_PARSE );
+                } catch ( \ParseError $e ) {
+                    return new \WP_Error(
+                        'php_syntax',
+                        sprintf(
+                            /* translators: 1: file name, 2: error */
+                            __( 'PHP syntax error in %1$s: %2$s', 'hero' ),
+                            $filename,
+                            $e->getMessage()
+                        )
+                    );
+                }
+            }
+            if ( $filename === 'schema.php' && function_exists( 'hero_is_schema_php_unsafe' ) && hero_is_schema_php_unsafe( $content ) ) {
+                return new \WP_Error( 'unsafe_schema', __( 'schema.php contains unsafe PHP constructs.', 'hero' ) );
+            }
+        }
+        return true;
+    }
+
+    /**
      * Write AI-generated section files to the uploads directory and
      * flush the section registry so the new section is immediately available.
      *
@@ -459,11 +602,6 @@ MSG;
             $section_content = "<?php\ndefined( 'ABSPATH' ) || exit;\n\n" . $section_raw;
         }
 
-        // Validate schema is syntactically safe (no function calls, no includes).
-        if ( preg_match( '/\b(include|require|eval|exec|system|passthru|shell_exec|popen|proc_open)\s*[(\s]/i', $schema_php ) ) {
-            return new \WP_Error( 'unsafe_schema', __( 'AI-generated schema contains unsafe PHP constructs.', 'hero' ) );
-        }
-
         // Validate PHP syntax before writing to disk. token_get_all() with TOKEN_PARSE
         // throws a ParseError on syntax errors (PHP 7.0+). This prevents installing
         // broken files that would cause a WordPress fatal error on every page load.
@@ -480,7 +618,14 @@ MSG;
         };
 
         $err = $syntax_check( $schema_content, 'schema.php' );
-        if ( $err ) return $err;
+        if ( $err ) {
+            return $err;
+        }
+
+        // Validate schema is safe (no includes / eval / dangerous calls) — tokenizer, not regex (avoids false positives in labels).
+        if ( hero_is_schema_php_unsafe( $schema_content ) ) {
+            return new \WP_Error( 'unsafe_schema', __( 'AI-generated schema contains unsafe PHP constructs.', 'hero' ) );
+        }
 
         $err = $syntax_check( $section_content, 'section.php' );
         if ( $err ) return $err;
@@ -681,6 +826,13 @@ PROMPT;
     }
 
     // ─── Helpers ──────────────────────────────────────────────────────────────
+
+    /**
+     * Whether AI is enabled and a key is present (e.g. for section file editor).
+     */
+    public function is_configured(): bool {
+        return $this->is_available();
+    }
 
     private function is_available(): bool {
         return $this->enabled && ! empty( $this->api_key );

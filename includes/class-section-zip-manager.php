@@ -34,7 +34,7 @@ class Hero_Section_Zip_Manager {
      * @param string $slug      Desired section slug (sanitised internally).
      * @return true|\WP_Error
      */
-    public function install_from_zip( string $tmp_file, string $slug ): true|\WP_Error {
+    public function install_from_zip( string $tmp_file, string $slug, bool $overwrite_existing = true ): true|\WP_Error {
         $slug = sanitize_title( $slug );
         if ( ! $slug ) {
             return new \WP_Error( 'invalid_slug', __( 'Invalid section slug.', 'hero' ) );
@@ -59,14 +59,27 @@ class Hero_Section_Zip_Manager {
 
         $target = $this->base_dir . $slug . '/';
 
-        // If section already exists, remove it first.
+        // If section already exists, remove it first (overwrite mode).
         if ( is_dir( $target ) ) {
+            if ( ! $overwrite_existing ) {
+                return new \WP_Error(
+                    'section_exists',
+                    sprintf( __( 'Section "%s" already exists.', 'hero' ), $slug )
+                );
+            }
             $this->delete_directory( $target );
         }
 
         wp_mkdir_p( $target );
         $zip->extractTo( $target );
         $zip->close();
+
+        // Normalize text files extracted from ZIPs (strip UTF-8 BOM),
+        // otherwise BOM can leak into REST output and break JSON parsing.
+        $this->normalize_extracted_text_files( $target );
+        // Normalize image defaults in schema.php to absolute uploads URLs
+        // so image fields show preview on first load in the editor.
+        $this->normalize_schema_image_defaults( $target . 'schema.php', $slug );
 
         // Post-extraction: validate that schema.php actually loads as an array and type matches slug.
         $schema_test = $this->test_schema_file( $target . 'schema.php', $slug );
@@ -330,5 +343,133 @@ class Hero_Section_Zip_Manager {
             }
         }
         rmdir( $dir );
+    }
+
+    /**
+     * Strip UTF-8 BOM from known section text files after extraction.
+     * This prevents accidental output before JSON responses.
+     */
+    private function normalize_extracted_text_files( string $target_dir ): void {
+        $text_files = [
+            'schema.php',
+            'section.php',
+            'style.css',
+            'script.js',
+        ];
+
+        foreach ( $text_files as $file ) {
+            $path = trailingslashit( $target_dir ) . $file;
+            if ( ! file_exists( $path ) || ! is_readable( $path ) ) {
+                continue;
+            }
+            $content = file_get_contents( $path );
+            if ( ! is_string( $content ) || $content === '' ) {
+                continue;
+            }
+            $normalized = preg_replace( '/^\xEF\xBB\xBF/', '', $content );
+            if ( is_string( $normalized ) && $normalized !== $content ) {
+                file_put_contents( $path, $normalized );
+            }
+        }
+    }
+
+    /**
+     * Convert schema image defaults from relative "media/..." paths
+     * to absolute uploads URLs for this section slug.
+     *
+     * Also applies to block_types settings.
+     */
+    private function normalize_schema_image_defaults( string $schema_file, string $slug ): void {
+        if ( ! file_exists( $schema_file ) || ! is_readable( $schema_file ) ) {
+            return;
+        }
+
+        try {
+            $loader = static function ( string $file ): mixed {
+                return include $file;
+            };
+            $schema = $loader( $schema_file );
+        } catch ( \Throwable $e ) {
+            return;
+        }
+
+        if ( ! is_array( $schema ) ) {
+            return;
+        }
+
+        $base = trailingslashit( $this->base_url ) . $slug . '/';
+        $schema = $this->normalize_image_defaults_in_field_list(
+            $schema,
+            $base
+        );
+
+        $php = "<?php\n";
+        $php .= "defined( 'ABSPATH' ) || exit;\n\n";
+        $php .= 'return ' . var_export( $schema, true ) . ";\n";
+        file_put_contents( $schema_file, $php );
+    }
+
+    /**
+     * @param array<string,mixed> $schema
+     * @return array<string,mixed>
+     */
+    private function normalize_image_defaults_in_field_list( array $schema, string $base_url ): array {
+        if ( isset( $schema['settings'] ) && is_array( $schema['settings'] ) ) {
+            foreach ( $schema['settings'] as $idx => $field ) {
+                if ( ! is_array( $field ) ) {
+                    continue;
+                }
+                $schema['settings'][ $idx ] = $this->normalize_image_default_field( $field, $base_url );
+            }
+        }
+
+        if ( isset( $schema['block_types'] ) && is_array( $schema['block_types'] ) ) {
+            foreach ( $schema['block_types'] as $type => $block_schema ) {
+                if ( ! is_array( $block_schema ) ) {
+                    continue;
+                }
+                if ( isset( $block_schema['settings'] ) && is_array( $block_schema['settings'] ) ) {
+                    foreach ( $block_schema['settings'] as $idx => $field ) {
+                        if ( ! is_array( $field ) ) {
+                            continue;
+                        }
+                        $block_schema['settings'][ $idx ] = $this->normalize_image_default_field( $field, $base_url );
+                    }
+                }
+                $schema['block_types'][ $type ] = $block_schema;
+            }
+        }
+
+        return $schema;
+    }
+
+    /**
+     * @param array<string,mixed> $field
+     * @return array<string,mixed>
+     */
+    private function normalize_image_default_field( array $field, string $base_url ): array {
+        $is_image = (string) ( $field['type'] ?? '' ) === 'image';
+        $default  = (string) ( $field['default'] ?? '' );
+        if ( ! $is_image || $default === '' ) {
+            return $field;
+        }
+
+        // Already absolute URL.
+        if ( preg_match( '#^https?://#i', $default ) ) {
+            return $field;
+        }
+
+        $normalized = ltrim( $default, '/' );
+        if ( str_starts_with( $normalized, './' ) ) {
+            $normalized = substr( $normalized, 2 );
+        }
+
+        // Support relative defaults like "media/foo.jpg" and "foo.jpg".
+        if ( ! str_starts_with( $normalized, 'media/' ) ) {
+            $normalized = 'media/' . $normalized;
+        }
+
+        $field['default'] = $base_url . $normalized;
+        return $field;
     }
 }

@@ -29,6 +29,7 @@ define( 'HERO_BLOCKS',   HERO_DIR . 'blocks/' );
 // ─── Autoloader ───────────────────────────────────────────────────────────────
 
 $includes = [
+    'includes/schema-safety.php',
     'includes/class-section-registry.php',
     'includes/class-block-registry.php',
     'includes/class-section-renderer.php',

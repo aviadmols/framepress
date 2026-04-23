@@ -37,6 +37,8 @@ class Hero_Builder_Page {
         add_submenu_page( 'hero', __( 'Footer Builder', 'hero' ),  __( 'Footer', 'hero' ),         'edit_pages',    'hero-footer',       [ $this, 'render_footer_builder' ] );
         add_submenu_page( 'hero', __( 'Global Settings', 'hero' ), __( 'Global Settings', 'hero' ),'edit_pages',    'hero-global',       [ $this, 'render_global_settings' ] );
         add_submenu_page( 'hero', __( 'Sections', 'hero' ),        __( 'Sections', 'hero' ),       'manage_options','hero-sections-mgr', [ $this, 'render_sections_manager' ] );
+        // Hidden: full-width section file editor (linked from the Sections list, not the menu).
+        add_submenu_page( null, __( 'Edit section files', 'hero' ), '', 'manage_options', 'hero-section-files', [ $this, 'render_section_files_editor' ] );
         add_submenu_page( 'hero', __( 'AI Settings', 'hero' ),     __( 'AI Settings', 'hero' ),    'manage_options','hero-ai-settings',  [ $this, 'render_ai_settings' ] );
     }
 
@@ -104,6 +106,14 @@ class Hero_Builder_Page {
     public function render_sections_manager(): void {
         // Data is injected inline in the template via wp_json_encode — no separate enqueue needed.
         require_once HERO_DIR . 'templates/sections-manager.php';
+    }
+
+    /** Full-page section file editor (no list); opened via `admin.php?page=hero-section-files&type=…`. */
+    public function render_section_files_editor(): void {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_die( esc_html__( 'You do not have permission to access this page.', 'hero' ) );
+        }
+        require_once HERO_DIR . 'templates/section-files-editor.php';
     }
 
     public function render_ai_settings(): void {

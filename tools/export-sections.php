@@ -9,9 +9,15 @@
 
 declare(strict_types=1);
 
-$defaultTarget = 'C:\Users\user\Desktop\Projects\FigmaProject';
+// Allow including plugin schema files that guard with `defined( 'ABSPATH' ) || exit;`.
+if (!defined('ABSPATH')) {
+    define('ABSPATH', dirname(__DIR__) . DIRECTORY_SEPARATOR);
+}
+
+$defaultTarget = 'C:\Users\user\Desktop\Projects\FigmaProject\sections-export';
 $targetRoot    = $argv[1] ?? $defaultTarget;
-$limit         = isset($argv[2]) ? max(1, (int) $argv[2]) : 3;
+$limitArg      = $argv[2] ?? 'all';
+$limit         = parseLimit($limitArg);
 
 $repoRoot    = dirname(__DIR__);
 $sectionsDir = $repoRoot . DIRECTORY_SEPARATOR . 'sections';
@@ -31,27 +37,25 @@ if (!is_dir($targetRoot) && !mkdir($targetRoot, 0777, true) && !is_dir($targetRo
     exit(1);
 }
 
-file_put_contents(
-    rtrim($targetRoot, "\\/") . DIRECTORY_SEPARATOR . 'export-debug.log',
-    '[' . date('c') . "] exporter-start target={$targetRoot} limit={$limit}\n",
-    FILE_APPEND
-);
+$debugLog = rtrim($targetRoot, "\\/") . DIRECTORY_SEPARATOR . 'export-debug.log';
+file_put_contents($debugLog, '[' . date('c') . "] exporter-start target={$targetRoot} limit_arg={$limitArg}\n", FILE_APPEND);
 
 $allSectionDirs = array_filter(glob($sectionsDir . DIRECTORY_SEPARATOR . '*', GLOB_ONLYDIR) ?: [], static function (string $dir): bool {
     return is_file($dir . DIRECTORY_SEPARATOR . 'schema.php');
 });
 
 sort($allSectionDirs, SORT_NATURAL | SORT_FLAG_CASE);
-$picked = array_slice($allSectionDirs, 0, $limit);
+$picked = $limit === null ? $allSectionDirs : array_slice($allSectionDirs, 0, $limit);
 
 if (count($picked) === 0) {
     fwrite(STDERR, "No sections with schema.php found.\n");
     exit(1);
 }
 
-$summary = [
+$report = [
     'generated_at' => date('c'),
     'target_root'  => $targetRoot,
+    'limit_arg'    => $limitArg,
     'picked_count' => count($picked),
     'sections'     => [],
 ];
@@ -60,6 +64,53 @@ foreach ($picked as $sectionDir) {
     $slug = basename($sectionDir);
     $outDir = rtrim($targetRoot, "\\/") . DIRECTORY_SEPARATOR . $slug;
     @mkdir($outDir, 0777, true);
+
+    $sectionReport = [
+        'slug'            => $slug,
+        'source_dir'      => $sectionDir,
+        'output_dir'      => $outDir,
+        'required_files'  => [],
+        'validation'      => [],
+        'status'          => 'pending',
+        'zip'             => null,
+        'media_count'     => 0,
+    ];
+
+    $requiredFiles = ['schema.php', 'section.php', 'style.css'];
+    foreach ($requiredFiles as $requiredFile) {
+        $exists = is_file($sectionDir . DIRECTORY_SEPARATOR . $requiredFile);
+        $sectionReport['required_files'][$requiredFile] = $exists;
+    }
+    $missingRequired = array_keys(array_filter(
+        $sectionReport['required_files'],
+        static fn (bool $exists): bool => $exists === false
+    ));
+    if ($missingRequired !== []) {
+        $sectionReport['status'] = 'failed_required_files';
+        $sectionReport['validation']['missing_required_files'] = $missingRequired;
+        $report['sections'][] = $sectionReport;
+        file_put_contents($debugLog, '[' . date('c') . "] skip {$slug}: missing required files: " . implode(', ', $missingRequired) . "\n", FILE_APPEND);
+        continue;
+    }
+
+    $schemaPath = $sectionDir . DIRECTORY_SEPARATOR . 'schema.php';
+    $schema = includeSchemaArray($schemaPath);
+    if (!is_array($schema) || $schema === []) {
+        $sectionReport['status'] = 'failed_schema_parse';
+        $sectionReport['validation']['schema_error'] = 'schema.php must return a non-empty array';
+        $report['sections'][] = $sectionReport;
+        file_put_contents($debugLog, '[' . date('c') . "] skip {$slug}: invalid schema array\n", FILE_APPEND);
+        continue;
+    }
+    $schemaType = (string)($schema['type'] ?? '');
+    $sectionReport['validation']['schema_type'] = $schemaType;
+    if ($schemaType !== $slug) {
+        $sectionReport['status'] = 'failed_schema_type_mismatch';
+        $sectionReport['validation']['schema_type_mismatch'] = sprintf('Expected "%s", got "%s"', $slug, $schemaType);
+        $report['sections'][] = $sectionReport;
+        file_put_contents($debugLog, '[' . date('c') . "] skip {$slug}: schema type mismatch (got {$schemaType})\n", FILE_APPEND);
+        continue;
+    }
 
     $copied = [];
     foreach (['schema.php', 'section.php', 'style.css', 'script.js'] as $name) {
@@ -78,31 +129,50 @@ foreach ($picked as $sectionDir) {
         copy($mediaPath, $dst);
     }
 
-    $schemaPath = $sectionDir . DIRECTORY_SEPARATOR . 'schema.php';
-    $schema = includeSchemaArray($schemaPath);
     $defaults = extractDefaults($schema);
     $html = buildPreviewHtml($slug, $schema, $defaults, $sectionDir);
     file_put_contents($outDir . DIRECTORY_SEPARATOR . 'section.html', $html);
 
     $zipPath = rtrim($targetRoot, "\\/") . DIRECTORY_SEPARATOR . $slug . '.zip';
     createZipFromDirectory($outDir, $zipPath);
+    $zipValidation = validateZipHasRequiredFiles($zipPath, ['schema.php', 'section.php', 'style.css']);
+    if ($zipValidation !== []) {
+        $sectionReport['status'] = 'failed_zip_validation';
+        $sectionReport['validation']['zip_missing_files'] = $zipValidation;
+        $sectionReport['zip'] = $zipPath;
+        $report['sections'][] = $sectionReport;
+        file_put_contents($debugLog, '[' . date('c') . "] invalid zip {$slug}: missing in zip: " . implode(', ', $zipValidation) . "\n", FILE_APPEND);
+        continue;
+    }
 
-    $summary['sections'][] = [
-        'slug'         => $slug,
-        'source_dir'   => $sectionDir,
-        'output_dir'   => $outDir,
-        'zip'          => $zipPath,
-        'copied_files' => $copied,
-        'media_count'  => count($mediaFiles),
-    ];
+    $sectionReport['status'] = 'zipped';
+    $sectionReport['zip'] = $zipPath;
+    $sectionReport['copied_files'] = $copied;
+    $sectionReport['media_count'] = count($mediaFiles);
+    $report['sections'][] = $sectionReport;
 
     echo "Exported {$slug} -> {$zipPath}" . PHP_EOL;
 }
 
-$summaryPath = rtrim($targetRoot, "\\/") . DIRECTORY_SEPARATOR . 'export-summary.json';
-file_put_contents($summaryPath, json_encode($summary, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+$summaryPath = rtrim($targetRoot, "\\/") . DIRECTORY_SEPARATOR . 'export-report.json';
+file_put_contents($summaryPath, json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 echo "Summary written: {$summaryPath}" . PHP_EOL;
 exit(0);
+
+/**
+ * @return int|null
+ */
+function parseLimit(string $raw): ?int
+{
+    $value = strtolower(trim($raw));
+    if ($value === '' || $value === 'all' || $value === '0') {
+        return null;
+    }
+    if (!ctype_digit($value)) {
+        return null;
+    }
+    return max(1, (int) $value);
+}
 
 /**
  * @return array<string,mixed>
@@ -223,4 +293,41 @@ function createZipFromDirectory(string $sourceDir, string $zipPath): void
         $zip->addFile($filePath, $relative);
     }
     $zip->close();
+}
+
+/**
+ * @param string[] $requiredFiles
+ * @return string[]
+ */
+function validateZipHasRequiredFiles(string $zipPath, array $requiredFiles): array
+{
+    $missing = [];
+    if (!is_file($zipPath) || !class_exists('ZipArchive')) {
+        return $requiredFiles;
+    }
+    $zip = new ZipArchive();
+    if ($zip->open($zipPath) !== true) {
+        return $requiredFiles;
+    }
+
+    $present = [];
+    for ($i = 0; $i < $zip->numFiles; $i++) {
+        $name = $zip->getNameIndex($i);
+        if (!is_string($name) || $name === '') {
+            continue;
+        }
+        $parts = explode('/', str_replace('\\', '/', $name));
+        $basename = end($parts);
+        if (is_string($basename) && $basename !== '') {
+            $present[$basename] = true;
+        }
+    }
+    $zip->close();
+
+    foreach ($requiredFiles as $requiredFile) {
+        if (!isset($present[$requiredFile])) {
+            $missing[] = $requiredFile;
+        }
+    }
+    return $missing;
 }

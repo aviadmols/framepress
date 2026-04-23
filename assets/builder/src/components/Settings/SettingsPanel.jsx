@@ -6,6 +6,7 @@ import CustomCssEditor  from './CustomCssEditor';
 
 const TABS = [
     { id: 'settings', label: 'Settings' },
+    { id: 'style',    label: 'Style' },
     { id: 'blocks',   label: 'Blocks' },
     { id: 'css',      label: 'CSS' },
 ];
@@ -49,7 +50,8 @@ export default function SettingsPanel() {
             </div>
 
             <div className="fp-settings-panel__body">
-                { activeTab === 'settings' && <SettingsForm section={ section } schema={ schema } /> }
+                { activeTab === 'settings' && <SettingsForm section={ section } schema={ schema } tab="settings" /> }
+                { activeTab === 'style'    && <SettingsForm section={ section } schema={ schema } tab="style" /> }
                 { activeTab === 'blocks'   && <BlocksEditor section={ section } schema={ schema } /> }
                 { activeTab === 'css'      && <CustomCssEditor section={ section } /> }
             </div>
