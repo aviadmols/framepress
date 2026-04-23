@@ -147,6 +147,8 @@ class Hero_Section_Registry {
                     continue;
                 }
 
+                $schema = $this->augment_schema_with_tag_controls( $schema );
+
                 $schema['_path']   = trailingslashit( $dir );
                 $schema['_source'] = $source;   // 'plugin' | 'theme' | 'uploads'
                 $schema['source']  = $source;   // exposed to REST API
@@ -215,5 +217,80 @@ class Hero_Section_Registry {
         }
 
         return true;
+    }
+
+    /**
+     * Adds a companion "{field_id}_tag" select control for textual fields so users
+     * can choose rendered HTML tags in Builder/Elementor.
+     *
+     * @param array<string,mixed> $schema
+     * @return array<string,mixed>
+     */
+    private function augment_schema_with_tag_controls( array $schema ): array {
+        $schema['settings'] = $this->augment_field_list_with_tag_controls( is_array( $schema['settings'] ?? null ) ? $schema['settings'] : [] );
+
+        if ( isset( $schema['block_types'] ) && is_array( $schema['block_types'] ) ) {
+            foreach ( $schema['block_types'] as $block_type => $block_schema ) {
+                if ( ! is_array( $block_schema ) ) {
+                    continue;
+                }
+                $block_settings = is_array( $block_schema['settings'] ?? null ) ? $block_schema['settings'] : [];
+                $block_schema['settings'] = $this->augment_field_list_with_tag_controls( $block_settings );
+                $schema['block_types'][ $block_type ] = $block_schema;
+            }
+        }
+
+        return $schema;
+    }
+
+    /**
+     * @param array<int,mixed> $fields
+     * @return array<int,mixed>
+     */
+    private function augment_field_list_with_tag_controls( array $fields ): array {
+        $out = [];
+        $existing_ids = [];
+        foreach ( $fields as $field ) {
+            if ( is_array( $field ) && isset( $field['id'] ) ) {
+                $existing_ids[] = sanitize_key( (string) $field['id'] );
+            }
+        }
+
+        foreach ( $fields as $field ) {
+            $out[] = $field;
+            if ( ! is_array( $field ) ) {
+                continue;
+            }
+            $id = isset( $field['id'] ) ? sanitize_key( (string) $field['id'] ) : '';
+            $type = isset( $field['type'] ) ? (string) $field['type'] : '';
+            if ( $id === '' || ! in_array( $type, [ 'text', 'textarea', 'richtext' ], true ) ) {
+                continue;
+            }
+
+            $tag_id = $id . '_tag';
+            if ( in_array( $tag_id, $existing_ids, true ) ) {
+                continue;
+            }
+
+            $out[] = [
+                'id'      => $tag_id,
+                'type'    => 'select',
+                'label'   => (string) ( $field['label'] ?? ucfirst( $id ) ) . ' HTML Tag',
+                'default' => 'auto',
+                'options' => [
+                    [ 'value' => 'auto', 'label' => 'Auto (template default)' ],
+                    [ 'value' => 'h1', 'label' => 'H1' ],
+                    [ 'value' => 'h2', 'label' => 'H2' ],
+                    [ 'value' => 'h3', 'label' => 'H3' ],
+                    [ 'value' => 'h4', 'label' => 'H4' ],
+                    [ 'value' => 'h5', 'label' => 'H5' ],
+                    [ 'value' => 'p', 'label' => 'P' ],
+                    [ 'value' => 'span', 'label' => 'SPAN' ],
+                    [ 'value' => 'div', 'label' => 'DIV' ],
+                ],
+            ];
+        }
+
+        return $out;
     }
 }

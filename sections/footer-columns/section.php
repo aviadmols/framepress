@@ -10,13 +10,16 @@ $columns    = in_array( $settings['columns'] ?? '4', [ '2', '3', '4' ], true ) ?
     <div class="fp-container">
         <div class="fp-footer-columns__grid">
             <?php foreach ( $blocks as $block ) :
-                if ( $block['type'] !== 'footer-column' ) continue; ?>
+                if ( $block['type'] !== 'footer-column' ) continue;
+                $heading_tag = hero_pick_tag( (string) ( $block['settings']['heading_tag'] ?? 'auto' ), 'h4' );
+                $content_tag = hero_pick_tag( (string) ( $block['settings']['content_tag'] ?? 'auto' ), 'div' );
+                ?>
             <div class="fp-footer-columns__col">
                 <?php if ( ! empty( $block['settings']['heading'] ) ) : ?>
-                <h4 class="fp-footer-columns__heading"><?php echo esc_html( $block['settings']['heading'] ); ?></h4>
+                <<?php echo $heading_tag; ?> class="fp-footer-columns__heading"><?php echo esc_html( $block['settings']['heading'] ); ?></<?php echo $heading_tag; ?>>
                 <?php endif; ?>
                 <div class="fp-footer-columns__content">
-                    <?php echo wp_kses_post( $block['settings']['content'] ?? '' ); ?>
+                    <<?php echo $content_tag; ?>><?php echo wp_kses_post( $block['settings']['content'] ?? '' ); ?></<?php echo $content_tag; ?>>
                 </div>
             </div>
             <?php endforeach; ?>

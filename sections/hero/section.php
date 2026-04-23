@@ -20,6 +20,8 @@ $content_align  = in_array( $settings['content_align'] ?? 'center', [ 'left', 'c
 
 $bg_url = esc_url( $settings['background_image'] ?? '' );
 $style  = 'min-height:' . $min_height . 'px; color:' . $text_color . ';';
+$title_tag = hero_pick_tag( (string) ( $settings['title_tag'] ?? 'auto' ), 'h1' );
+$subtitle_tag = hero_pick_tag( (string) ( $settings['subtitle_tag'] ?? 'auto' ), 'p' );
 if ( $bg_url ) {
     $style .= ' background-image:url(' . $bg_url . '); background-size:cover; background-position:center;';
 }
@@ -34,11 +36,11 @@ if ( $bg_url ) {
         <div class="fp-hero__content">
 
             <?php if ( ! empty( $settings['title'] ) ) : ?>
-            <h1 class="fp-hero__title"><?php echo esc_html( $settings['title'] ); ?></h1>
+            <<?php echo $title_tag; ?> class="fp-hero__title"><?php echo esc_html( $settings['title'] ); ?></<?php echo $title_tag; ?>>
             <?php endif; ?>
 
             <?php if ( ! empty( $settings['subtitle'] ) ) : ?>
-            <p class="fp-hero__subtitle"><?php echo wp_kses_post( $settings['subtitle'] ); ?></p>
+            <<?php echo $subtitle_tag; ?> class="fp-hero__subtitle"><?php echo wp_kses_post( $settings['subtitle'] ); ?></<?php echo $subtitle_tag; ?>>
             <?php endif; ?>
 
             <?php if ( ! empty( $blocks ) ) : ?>

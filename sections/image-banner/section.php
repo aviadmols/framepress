@@ -8,6 +8,8 @@ $opacity    = min( 100, max( 0, (int) ( $settings['overlay_opacity'] ?? 30 ) ) )
 $text_color = esc_attr( $settings['text_color'] ?? '#fff' );
 $align      = in_array( $settings['content_align'] ?? 'center', [ 'left', 'center', 'right' ], true )
     ? $settings['content_align'] : 'center';
+$title_tag = hero_pick_tag( (string) ( $settings['title_tag'] ?? 'auto' ), 'h2' );
+$subtitle_tag = hero_pick_tag( (string) ( $settings['subtitle_tag'] ?? 'auto' ), 'p' );
 
 $style = 'height:' . $height . 'px; color:' . $text_color . ';';
 if ( $img_url ) {
@@ -24,10 +26,10 @@ if ( $img_url ) {
     <div class="fp-container">
         <div class="fp-image-banner__content">
             <?php if ( ! empty( $settings['title'] ) ) : ?>
-            <h2 class="fp-image-banner__title"><?php echo esc_html( $settings['title'] ); ?></h2>
+            <<?php echo $title_tag; ?> class="fp-image-banner__title"><?php echo esc_html( $settings['title'] ); ?></<?php echo $title_tag; ?>>
             <?php endif; ?>
             <?php if ( ! empty( $settings['subtitle'] ) ) : ?>
-            <p class="fp-image-banner__subtitle"><?php echo wp_kses_post( $settings['subtitle'] ); ?></p>
+            <<?php echo $subtitle_tag; ?> class="fp-image-banner__subtitle"><?php echo wp_kses_post( $settings['subtitle'] ); ?></<?php echo $subtitle_tag; ?>>
             <?php endif; ?>
             <?php foreach ( $blocks as $block ) :
                 if ( $block['type'] !== 'button' ) continue; ?>

@@ -274,3 +274,17 @@ add_action(
     },
     20
 );
+
+if ( ! function_exists( 'hero_pick_tag' ) ) {
+    /**
+     * Resolve a safe HTML tag from user selection.
+     */
+    function hero_pick_tag( string $selected, string $fallback = 'div' ): string {
+        $allowed = [ 'h1', 'h2', 'h3', 'h4', 'h5', 'p', 'span', 'div' ];
+        $selected = strtolower( sanitize_key( $selected ) );
+        if ( $selected === '' || $selected === 'auto' ) {
+            $selected = strtolower( sanitize_key( $fallback ) );
+        }
+        return in_array( $selected, $allowed, true ) ? $selected : 'div';
+    }
+}

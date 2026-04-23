@@ -7,6 +7,7 @@ $category    = absint( $settings['category'] ?? 0 );
 $show_exc    = ! empty( $settings['show_excerpt'] );
 $show_date   = ! empty( $settings['show_date'] );
 $show_img    = ! empty( $settings['show_image'] );
+$title_tag   = hero_pick_tag( (string) ( $settings['title_tag'] ?? 'auto' ), 'h2' );
 
 $query_args = [
     'post_type'      => 'post',
@@ -24,7 +25,7 @@ $posts_query = new WP_Query( $query_args );
     <div class="fp-container">
 
         <?php if ( ! empty( $settings['title'] ) ) : ?>
-        <h2 class="fp-posts-grid__title"><?php echo esc_html( $settings['title'] ); ?></h2>
+        <<?php echo $title_tag; ?> class="fp-posts-grid__title"><?php echo esc_html( $settings['title'] ); ?></<?php echo $title_tag; ?>>
         <?php endif; ?>
 
         <?php if ( $posts_query->have_posts() ) : ?>

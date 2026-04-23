@@ -109,13 +109,7 @@ class Hero_Elementor_Section_Widget extends \Elementor\Widget_Base {
             'content_classes' => 'elementor-descriptor',
         ] );
 
-        if ( ! empty( $schema['blocks']['allowed'] ) ) {
-            $this->add_control( 'fp_blocks_notice', [
-                'type'            => \Elementor\Controls_Manager::RAW_HTML,
-                'raw'             => $this->render_blocks_notice( $schema ),
-                'content_classes' => 'elementor-descriptor',
-            ] );
-        }
+        $this->register_block_controls( $schema );
 
         $this->end_controls_section();
         $this->register_typography_controls();
@@ -180,6 +174,179 @@ class Hero_Elementor_Section_Widget extends \Elementor\Widget_Base {
         ] );
 
         $this->end_controls_section();
+    }
+
+    /**
+     * Register dynamic block repeaters from schema blocks.allowed/block_types.
+     *
+     * @param array<string, mixed> $schema
+     */
+    private function register_block_controls( array $schema ): void {
+        $allowed = $schema['blocks']['allowed'] ?? [];
+        if ( ! is_array( $allowed ) || $allowed === [] ) {
+            return;
+        }
+
+        $stored = $this->load_stored_instance();
+        $stored_blocks = is_array( $stored['blocks'] ?? null ) ? $stored['blocks'] : [];
+        $min = isset( $schema['blocks']['min'] ) && is_numeric( $schema['blocks']['min'] ) ? (int) $schema['blocks']['min'] : 0;
+
+        foreach ( $allowed as $block_type_raw ) {
+            $block_type = sanitize_key( (string) $block_type_raw );
+            if ( $block_type === '' ) {
+                continue;
+            }
+            $block_schema = $this->get_block_schema( $schema, $block_type );
+            if ( ! $block_schema ) {
+                continue;
+            }
+
+            $repeater = new \Elementor\Repeater();
+            foreach ( $block_schema['settings'] ?? [] as $field ) {
+                if ( ! is_array( $field ) ) {
+                    continue;
+                }
+                $field_id = isset( $field['id'] ) ? sanitize_key( (string) $field['id'] ) : '';
+                if ( $field_id === '' ) {
+                    continue;
+                }
+                $this->add_repeater_control_for_block_field(
+                    $repeater,
+                    $field,
+                    $this->get_block_field_control_id( $block_type, $field_id )
+                );
+            }
+
+            $label = isset( $block_schema['label'] ) ? (string) $block_schema['label'] : $block_type;
+            $this->add_control(
+                $this->get_block_repeater_control_id( $block_type ),
+                [
+                    'label'       => sprintf( __( '%s Items', 'hero' ), $label ),
+                    'type'        => \Elementor\Controls_Manager::REPEATER,
+                    'fields'      => $repeater->get_controls(),
+                    'title_field' => '{{{ ' . $this->get_block_field_control_id( $block_type, 'question' ) . ' || _id }}}',
+                    'default'     => $this->build_repeater_default_rows( $block_type, $block_schema, $stored_blocks, $min ),
+                ]
+            );
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $schema
+     * @return array<string, mixed>|null
+     */
+    private function get_block_schema( array $schema, string $block_type ): ?array {
+        if ( isset( $schema['block_types'][ $block_type ] ) && is_array( $schema['block_types'][ $block_type ] ) ) {
+            return $schema['block_types'][ $block_type ];
+        }
+        $global = HERO::get_instance()->block_registry->get_block( $block_type );
+        return is_array( $global ) ? $global : null;
+    }
+
+    private function get_block_repeater_control_id( string $block_type ): string {
+        return 'fp_blocks_' . str_replace( '-', '_', sanitize_key( $block_type ) );
+    }
+
+    private function get_block_field_control_id( string $block_type, string $field_id ): string {
+        return 'fpb_' . str_replace( '-', '_', sanitize_key( $block_type ) ) . '__' . sanitize_key( $field_id );
+    }
+
+    /**
+     * @param array<string, mixed> $field
+     */
+    private function add_repeater_control_for_block_field( \Elementor\Repeater $repeater, array $field, string $control_id ): void {
+        $type  = isset( $field['type'] ) ? (string) $field['type'] : 'text';
+        $label = isset( $field['label'] ) ? (string) $field['label'] : $control_id;
+        $default = $field['default'] ?? '';
+        $control = [ 'label' => $label ];
+
+        switch ( $type ) {
+            case 'textarea':
+                $control['type'] = \Elementor\Controls_Manager::TEXTAREA;
+                $control['default'] = (string) $default;
+                break;
+            case 'richtext':
+                $control['type'] = \Elementor\Controls_Manager::WYSIWYG;
+                $control['default'] = (string) $default;
+                break;
+            case 'image':
+                $control['type'] = \Elementor\Controls_Manager::MEDIA;
+                $control['default'] = [ 'url' => $this->default_as_string( $default ) ];
+                break;
+            case 'color':
+                $control['type'] = \Elementor\Controls_Manager::COLOR;
+                $control['default'] = (string) $default;
+                break;
+            case 'number':
+                $control['type'] = \Elementor\Controls_Manager::NUMBER;
+                if ( isset( $field['min'] ) ) {
+                    $control['min'] = (float) $field['min'];
+                }
+                if ( isset( $field['max'] ) ) {
+                    $control['max'] = (float) $field['max'];
+                }
+                $control['default'] = is_numeric( $default ) ? ( $default + 0 ) : 0;
+                break;
+            case 'select':
+                $control['type'] = \Elementor\Controls_Manager::SELECT;
+                $control['options'] = $this->select_options_for_elementor( is_array( $field['options'] ?? null ) ? $field['options'] : [] );
+                $control['default'] = (string) $default;
+                break;
+            case 'checkbox':
+                $control['type'] = \Elementor\Controls_Manager::SWITCHER;
+                $control['default'] = ! empty( $default ) ? 'yes' : '';
+                break;
+            case 'url':
+                $control['type'] = \Elementor\Controls_Manager::URL;
+                $control['default'] = [ 'url' => (string) $default, 'is_external' => false, 'nofollow' => false ];
+                break;
+            default:
+                $control['type'] = \Elementor\Controls_Manager::TEXT;
+                $control['default'] = (string) $default;
+                break;
+        }
+
+        $repeater->add_control( $control_id, $control );
+    }
+
+    /**
+     * @param array<int, array<string,mixed>> $stored_blocks
+     * @param array<string,mixed> $block_schema
+     * @return array<int, array<string,mixed>>
+     */
+    private function build_repeater_default_rows( string $block_type, array $block_schema, array $stored_blocks, int $min ): array {
+        $rows = [];
+        foreach ( $stored_blocks as $block ) {
+            if ( ! is_array( $block ) || ( $block['type'] ?? '' ) !== $block_type ) {
+                continue;
+            }
+            $row = [];
+            $settings = is_array( $block['settings'] ?? null ) ? $block['settings'] : [];
+            foreach ( $block_schema['settings'] ?? [] as $field ) {
+                if ( ! is_array( $field ) || empty( $field['id'] ) ) {
+                    continue;
+                }
+                $fid = sanitize_key( (string) $field['id'] );
+                $row[ $this->get_block_field_control_id( $block_type, $fid ) ] = $settings[ $fid ] ?? ( $field['default'] ?? '' );
+            }
+            $rows[] = $row;
+        }
+
+        if ( $rows === [] && $min > 0 ) {
+            for ( $i = 0; $i < $min; $i++ ) {
+                $row = [];
+                foreach ( $block_schema['settings'] ?? [] as $field ) {
+                    if ( ! is_array( $field ) || empty( $field['id'] ) ) {
+                        continue;
+                    }
+                    $fid = sanitize_key( (string) $field['id'] );
+                    $row[ $this->get_block_field_control_id( $block_type, $fid ) ] = $field['default'] ?? '';
+                }
+                $rows[] = $row;
+            }
+        }
+
+        return $rows;
     }
 
     /**
@@ -443,6 +610,7 @@ class Hero_Elementor_Section_Widget extends \Elementor\Widget_Base {
 
         $stored['type']     = $type;
         $stored['settings'] = $settings;
+        $stored['blocks']   = $this->build_blocks_from_display( $schema, $display, $stored['blocks'] ?? [] );
         $stored['fp_typography'] = $this->extract_typography_settings( $display );
 
         $custom_css = trim( (string) ( $stored['custom_css'] ?? '' ) );
@@ -454,6 +622,61 @@ class Hero_Elementor_Section_Widget extends \Elementor\Widget_Base {
         }
 
         return $stored;
+    }
+
+    /**
+     * @param array<string, mixed> $schema
+     * @param array<string, mixed> $display
+     * @param mixed $existing_blocks
+     * @return array<int, array<string,mixed>>
+     */
+    private function build_blocks_from_display( array $schema, array $display, mixed $existing_blocks ): array {
+        $allowed = is_array( $schema['blocks']['allowed'] ?? null ) ? $schema['blocks']['allowed'] : [];
+        if ( $allowed === [] ) {
+            return is_array( $existing_blocks ) ? $existing_blocks : [];
+        }
+
+        $out = [];
+        foreach ( $allowed as $block_type_raw ) {
+            $block_type = sanitize_key( (string) $block_type_raw );
+            if ( $block_type === '' ) {
+                continue;
+            }
+            $block_schema = $this->get_block_schema( $schema, $block_type );
+            if ( ! $block_schema ) {
+                continue;
+            }
+
+            $repeater_key = $this->get_block_repeater_control_id( $block_type );
+            $rows = $display[ $repeater_key ] ?? [];
+            if ( ! is_array( $rows ) ) {
+                $rows = [];
+            }
+
+            foreach ( $rows as $row ) {
+                if ( ! is_array( $row ) ) {
+                    continue;
+                }
+                $item_settings = [];
+                foreach ( $block_schema['settings'] ?? [] as $field ) {
+                    if ( ! is_array( $field ) || empty( $field['id'] ) ) {
+                        continue;
+                    }
+                    $fid = sanitize_key( (string) $field['id'] );
+                    $control_id = $this->get_block_field_control_id( $block_type, $fid );
+                    $item_settings[ $fid ] = $this->normalize_setting_for_fp( $field, $row[ $control_id ] ?? ( $field['default'] ?? '' ) );
+                }
+
+                $row_id = isset( $row['_id'] ) ? sanitize_key( (string) $row['_id'] ) : '';
+                $out[] = [
+                    'id'       => $row_id !== '' ? ( 'b-' . $row_id ) : ( 'b-' . uniqid() ),
+                    'type'     => $block_type,
+                    'settings' => $item_settings,
+                ];
+            }
+        }
+
+        return $out;
     }
 
     /**
@@ -524,9 +747,17 @@ class Hero_Elementor_Section_Widget extends \Elementor\Widget_Base {
             if ( $tablet_lh !== '' ) {
                 $tablet_rules[] = 'line-height:' . $tablet_lh;
             }
+            $tablet_rule_str = implode( ';', $tablet_rules ) . ';';
             $css .= '@media (max-width:1024px){'
                 . $selector . ', ' . $selector . ' p, ' . $selector . ' li, ' . $selector . ' a, ' . $selector . ' span'
-                . '{' . implode( ';', $tablet_rules ) . ';}}';
+                . '{' . $tablet_rule_str . '}}';
+            // Elementor editor device preview mode (doesn't always change true viewport width).
+            $css .= 'body.elementor-device-tablet ' . $selector . ', '
+                . 'body.elementor-device-tablet ' . $selector . ' p, '
+                . 'body.elementor-device-tablet ' . $selector . ' li, '
+                . 'body.elementor-device-tablet ' . $selector . ' a, '
+                . 'body.elementor-device-tablet ' . $selector . ' span'
+                . '{' . $tablet_rule_str . '}';
         }
         if ( $mobile_size !== '' || $mobile_lh !== '' ) {
             $mobile_rules = [];
@@ -536,9 +767,17 @@ class Hero_Elementor_Section_Widget extends \Elementor\Widget_Base {
             if ( $mobile_lh !== '' ) {
                 $mobile_rules[] = 'line-height:' . $mobile_lh;
             }
+            $mobile_rule_str = implode( ';', $mobile_rules ) . ';';
             $css .= '@media (max-width:767px){'
                 . $selector . ', ' . $selector . ' p, ' . $selector . ' li, ' . $selector . ' a, ' . $selector . ' span'
-                . '{' . implode( ';', $mobile_rules ) . ';}}';
+                . '{' . $mobile_rule_str . '}}';
+            // Elementor editor device preview mode (doesn't always change true viewport width).
+            $css .= 'body.elementor-device-mobile ' . $selector . ', '
+                . 'body.elementor-device-mobile ' . $selector . ' p, '
+                . 'body.elementor-device-mobile ' . $selector . ' li, '
+                . 'body.elementor-device-mobile ' . $selector . ' a, '
+                . 'body.elementor-device-mobile ' . $selector . ' span'
+                . '{' . $mobile_rule_str . '}';
         }
         return $css;
     }
