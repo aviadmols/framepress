@@ -5,6 +5,7 @@ import SaveBar              from './components/SaveBar';
 import AISettingsPage       from './components/AISettings/AISettingsPage';
 import SectionsManager      from './components/SectionsManager/SectionsManager';
 import GlobalSettingsPage   from './components/GlobalSettings/GlobalSettingsPage';
+import CodeEditorDrawer     from './components/CodeEditor/CodeEditorDrawer';
 import { useBuilder }       from './context/BuilderContext';
 
 export default function App() {
@@ -25,13 +26,14 @@ export default function App() {
     }
 
     return (
-        <div className="fp-builder">
+        <div className={ `fp-builder${ state.editingCodeSectionType ? ' fp-builder--drawer-open' : '' }` }>
             <Sidebar />
             <main className="fp-builder__main">
                 <PreviewArea />
             </main>
             { state.selectedSectionId && <SettingsPanel /> }
             <SaveBar />
+            <CodeEditorDrawer />
         </div>
     );
 }

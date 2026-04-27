@@ -30,6 +30,7 @@ export default function SettingsPanel() {
         <aside className="fp-settings-panel">
             <div className="fp-settings-panel__header">
                 <span className="fp-settings-panel__title">{ schema?.label || section.type }</span>
+                { section.type && <span className="fp-section-type-badge">{ section.type }</span> }
                 <button
                     className="fp-icon-btn"
                     onClick={ () => dispatch( { type: 'DESELECT' } ) }

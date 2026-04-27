@@ -112,6 +112,46 @@ class Hero_Preview {
         $ctx      = esc_js( $this->preview_context );
         $debug    = ( defined( 'WP_DEBUG' ) && WP_DEBUG ) ? 'true' : 'false';
         ?>
+        <style id="hero-preview-ui">
+        .hero-section {
+            position: relative;
+            outline: 2px solid transparent;
+            outline-offset: -2px;
+            cursor: pointer;
+            transition: outline-color 0.15s;
+        }
+        .hero-section:hover { outline-color: rgba(44,110,203,0.35); }
+        .hero-section--selected { outline-color: #2c6ecb !important; }
+        .hero-drag-handle {
+            position: absolute;
+            top: 8px;
+            right: 10px;
+            z-index: 9999;
+            background: rgba(44,110,203,0.85);
+            border-radius: 5px;
+            padding: 5px 7px;
+            cursor: grab;
+            opacity: 0;
+            transition: opacity 0.2s;
+            display: flex;
+            align-items: center;
+            backdrop-filter: blur(2px);
+        }
+        .hero-section:hover .hero-drag-handle,
+        .hero-section--selected .hero-drag-handle { opacity: 1; }
+        .hero-drag-handle:active { cursor: grabbing; }
+        .hero-drag-placeholder {
+            background: rgba(44,110,203,0.08);
+            border: 2px dashed #2c6ecb;
+            border-radius: 4px;
+            margin: 4px 0;
+            pointer-events: none;
+        }
+        .hero-section.hero-dragging {
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+            z-index: 9998;
+        }
+        </style>
         <script id="hero-preview-bridge">
         (function() {
             var REST_URL = '<?php echo $rest_url; ?>';
@@ -407,13 +447,166 @@ class Hero_Preview {
                             orderedIds.forEach(function(sid) {
                                 dispatchSectionMounted(sid);
                             });
+                            // Re-attach drag handles after DOM update
+                            if (typeof addDragHandles === 'function') addDragHandles();
                         }
                     });
                 });
             });
 
+            // ── Click-to-select ───────────────────────────────────────────────
+
+            function setSelectedHighlight(id) {
+                document.querySelectorAll('.hero-section').forEach(function(el) {
+                    el.classList.remove('hero-section--selected');
+                });
+                if (id) {
+                    var el = document.getElementById('hero-section-' + id);
+                    if (el) el.classList.add('hero-section--selected');
+                }
+            }
+
+            // Capture-phase click listener: tells parent which section was clicked.
+            document.addEventListener('click', function(event) {
+                var el = event.target;
+                // Don't interfere with drag handle
+                if (el.closest && el.closest('.hero-drag-handle')) return;
+                while (el && el !== document.body) {
+                    if (el.classList && el.classList.contains('hero-section')) {
+                        var sid = el.id.replace('hero-section-', '');
+                        window.parent.postMessage({ type: 'HERO_SECTION_CLICK', sectionId: sid }, window.location.origin);
+                        break;
+                    }
+                    el = el.parentElement;
+                }
+            }, true);
+
+            // ── Drag-to-reorder ───────────────────────────────────────────────
+
+            var _drag = null;
+
+            function addDragHandles() {
+                var scopeRoot = getPreviewScopeRootFor(PREVIEW_CONTEXT);
+                if (!scopeRoot) return;
+                scopeRoot.querySelectorAll('.hero-section').forEach(function(section) {
+                    if (section.querySelector('.hero-drag-handle')) return;
+                    var h = document.createElement('div');
+                    h.className = 'hero-drag-handle';
+                    h.title = 'Drag to reorder';
+                    h.innerHTML = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="4.5" cy="3.5" r="1.5" fill="#fff"/><circle cx="9.5" cy="3.5" r="1.5" fill="#fff"/><circle cx="4.5" cy="7" r="1.5" fill="#fff"/><circle cx="9.5" cy="7" r="1.5" fill="#fff"/><circle cx="4.5" cy="10.5" r="1.5" fill="#fff"/><circle cx="9.5" cy="10.5" r="1.5" fill="#fff"/></svg>';
+                    h.addEventListener('mousedown', onDragStart);
+                    section.prepend(h);
+                });
+            }
+
+            function onDragStart(event) {
+                event.preventDefault();
+                event.stopPropagation();
+                var section = event.currentTarget.parentElement;
+                var scopeRoot = getPreviewScopeRootFor(PREVIEW_CONTEXT);
+                if (!scopeRoot) return;
+
+                var rect = section.getBoundingClientRect();
+                var ph = document.createElement('div');
+                ph.className = 'hero-drag-placeholder';
+                ph.style.height = rect.height + 'px';
+
+                _drag = {
+                    el: section,
+                    placeholder: ph,
+                    scopeRoot: scopeRoot,
+                    startY: event.clientY,
+                    origTop: rect.top,
+                };
+
+                section.classList.add('hero-dragging');
+                section.parentNode.insertBefore(ph, section.nextSibling);
+                section.style.cssText = [
+                    'position:fixed',
+                    'z-index:9998',
+                    'width:' + rect.width + 'px',
+                    'top:' + rect.top + 'px',
+                    'left:' + rect.left + 'px',
+                    'opacity:0.92',
+                    'pointer-events:none',
+                    'margin:0',
+                ].join(';');
+
+                document.addEventListener('mousemove', onDragMove);
+                document.addEventListener('mouseup', onDragEnd);
+            }
+
+            function onDragMove(event) {
+                if (!_drag) return;
+                var dy = event.clientY - _drag.startY;
+                _drag.startY = event.clientY;
+                var cur = parseFloat(_drag.el.style.top) || _drag.origTop;
+                _drag.el.style.top = (cur + dy) + 'px';
+
+                var sections = Array.from(_drag.scopeRoot.querySelectorAll('.hero-section:not(.hero-dragging)'));
+                var insertBefore = null;
+                for (var i = 0; i < sections.length; i++) {
+                    var r = sections[i].getBoundingClientRect();
+                    if (event.clientY < r.top + r.height / 2) {
+                        insertBefore = sections[i];
+                        break;
+                    }
+                }
+                if (insertBefore) {
+                    _drag.scopeRoot.insertBefore(_drag.placeholder, insertBefore);
+                } else {
+                    _drag.scopeRoot.appendChild(_drag.placeholder);
+                }
+            }
+
+            function onDragEnd() {
+                if (!_drag) return;
+                document.removeEventListener('mousemove', onDragMove);
+                document.removeEventListener('mouseup', onDragEnd);
+
+                _drag.scopeRoot.insertBefore(_drag.el, _drag.placeholder);
+                _drag.placeholder.remove();
+                _drag.el.style.cssText = '';
+                _drag.el.classList.remove('hero-dragging');
+
+                var newOrder = Array.from(_drag.scopeRoot.querySelectorAll('.hero-section')).map(function(el) {
+                    return el.id.replace('hero-section-', '');
+                });
+                window.parent.postMessage({ type: 'HERO_REORDER', orderedIds: newOrder }, window.location.origin);
+                _drag = null;
+            }
+
+            // ── Incoming messages from parent ─────────────────────────────────
+
+            window.addEventListener('message', function(event) {
+                if (event.origin !== window.location.origin) return;
+                var msg = event.data;
+                if (!msg || !msg.type) return;
+
+                if (msg.type === 'HERO_SELECT_SECTION') {
+                    setSelectedHighlight(msg.sectionId || null);
+                }
+
+                if (msg.type === 'HERO_DRAFT_PREVIEW' && msg.sectionType) {
+                    var cls = 'hero-section--' + msg.sectionType;
+                    document.querySelectorAll('.hero-section').forEach(function(wrapper) {
+                        if (wrapper.classList.contains(cls)) {
+                            wrapper.innerHTML = msg.html;
+                            addDragHandles(); // re-attach handles after DOM replace
+                        }
+                    });
+                }
+            });
+
             // Signal to the parent editor that the preview is ready.
             window.parent.postMessage({ type: 'HERO_PREVIEW_READY' }, window.location.origin);
+
+            // Add drag handles once DOM is ready (sections already in DOM from initial load)
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', addDragHandles);
+            } else {
+                addDragHandles();
+            }
         })();
         </script>
         <?php

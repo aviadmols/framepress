@@ -100,7 +100,9 @@ final class HERO {
 
         // Section assets + global design tokens: hook outside is_admin() so Elementor preview iframe
         // (runs wp_enqueue_scripts / wp_head as frontend) still loads CSS/JS and :root variables.
-        add_action( 'wp_enqueue_scripts', [ $this->assets, 'enqueue_section_assets' ] );
+        // Priority 999 ensures section stylesheets enqueue after typical theme stylesheets, so
+        // for equal-specificity rules the section's CSS wins on source order.
+        add_action( 'wp_enqueue_scripts', [ $this->assets, 'enqueue_section_assets' ], 999 );
         add_action( 'wp_head',            [ $this->global_settings, 'output_css_variables' ] );
 
         // Output hooks — frontend only (not Elementor editor shell).

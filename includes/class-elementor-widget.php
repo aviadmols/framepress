@@ -91,12 +91,17 @@ class Hero_Elementor_Section_Widget extends \Elementor\Widget_Base {
             return;
         }
 
+        $all_fields    = $schema['settings'] ?? [];
+        $content_fields = array_filter( $all_fields, fn( $f ) => ( $f['tab'] ?? 'settings' ) !== 'style' );
+        $style_fields   = array_filter( $all_fields, fn( $f ) => ( $f['tab'] ?? 'settings' ) === 'style' );
+
+        // --- Content tab ---
         $this->start_controls_section( 'content_section', [
             'label' => $schema['label'] ?? __( 'HERO Section', 'hero' ),
             'tab'   => \Elementor\Controls_Manager::TAB_CONTENT,
         ] );
 
-        foreach ( $schema['settings'] ?? [] as $field ) {
+        foreach ( $content_fields as $field ) {
             $this->register_field_control( $field );
         }
 
@@ -112,6 +117,19 @@ class Hero_Elementor_Section_Widget extends \Elementor\Widget_Base {
         $this->register_block_controls( $schema );
 
         $this->end_controls_section();
+
+        // --- Style tab (schema fields with 'tab' => 'style') ---
+        if ( ! empty( $style_fields ) ) {
+            $this->start_controls_section( 'hero_style_settings', [
+                'label' => __( 'Style', 'hero' ),
+                'tab'   => \Elementor\Controls_Manager::TAB_STYLE,
+            ] );
+            foreach ( $style_fields as $field ) {
+                $this->register_field_control( $field );
+            }
+            $this->end_controls_section();
+        }
+
         $this->register_typography_controls();
     }
 
@@ -187,8 +205,14 @@ class Hero_Elementor_Section_Widget extends \Elementor\Widget_Base {
             return;
         }
 
-        $stored = $this->load_stored_instance();
+        $stored        = $this->load_stored_instance();
         $stored_blocks = is_array( $stored['blocks'] ?? null ) ? $stored['blocks'] : [];
+
+        // Fall back to schema default_blocks when no instance data exists yet.
+        if ( empty( $stored_blocks ) && ! empty( $schema['default_blocks'] ) && is_array( $schema['default_blocks'] ) ) {
+            $stored_blocks = $schema['default_blocks'];
+        }
+
         $min = isset( $schema['blocks']['min'] ) && is_numeric( $schema['blocks']['min'] ) ? (int) $schema['blocks']['min'] : 0;
 
         foreach ( $allowed as $block_type_raw ) {
@@ -201,7 +225,8 @@ class Hero_Elementor_Section_Widget extends \Elementor\Widget_Base {
                 continue;
             }
 
-            $repeater = new \Elementor\Repeater();
+            $repeater       = new \Elementor\Repeater();
+            $first_text_ctl = '';
             foreach ( $block_schema['settings'] ?? [] as $field ) {
                 if ( ! is_array( $field ) ) {
                     continue;
@@ -210,21 +235,22 @@ class Hero_Elementor_Section_Widget extends \Elementor\Widget_Base {
                 if ( $field_id === '' ) {
                     continue;
                 }
-                $this->add_repeater_control_for_block_field(
-                    $repeater,
-                    $field,
-                    $this->get_block_field_control_id( $block_type, $field_id )
-                );
+                $ctl_id = $this->get_block_field_control_id( $block_type, $field_id );
+                if ( $first_text_ctl === '' && in_array( $field['type'] ?? 'text', [ 'text', 'textarea' ], true ) ) {
+                    $first_text_ctl = $ctl_id;
+                }
+                $this->add_repeater_control_for_block_field( $repeater, $field, $ctl_id );
             }
 
-            $label = isset( $block_schema['label'] ) ? (string) $block_schema['label'] : $block_type;
+            $title_tpl = $first_text_ctl !== '' ? '{{{ ' . $first_text_ctl . ' || _id }}}' : '{{{ _id }}}';
+            $label     = isset( $block_schema['label'] ) ? (string) $block_schema['label'] : $block_type;
             $this->add_control(
                 $this->get_block_repeater_control_id( $block_type ),
                 [
                     'label'       => sprintf( __( '%s Items', 'hero' ), $label ),
                     'type'        => \Elementor\Controls_Manager::REPEATER,
                     'fields'      => $repeater->get_controls(),
-                    'title_field' => '{{{ ' . $this->get_block_field_control_id( $block_type, 'question' ) . ' || _id }}}',
+                    'title_field' => $title_tpl,
                     'default'     => $this->build_repeater_default_rows( $block_type, $block_schema, $stored_blocks, $min ),
                 ]
             );

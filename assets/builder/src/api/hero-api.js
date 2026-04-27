@@ -67,6 +67,11 @@ export const api = {
     },
     deleteSection: ( type, force = false ) => request( `sections/${ type }${ force ? '?force=1' : '' }`, { method: 'DELETE' } ),
 
+    // ── Section file editor ───────────────────────────────────────────────────
+    getSectionFiles:   ( type )         => request( `sections-manager/${ encodeURIComponent( type ) }/files` ),
+    saveSectionFiles:  ( type, files )  => request( `sections-manager/${ encodeURIComponent( type ) }/files`, { method: 'POST', body: JSON.stringify( { files } ) } ),
+    draftPreview:      ( type, files )  => request( `sections-manager/${ encodeURIComponent( type ) }/draft-preview`, { method: 'POST', body: JSON.stringify( { files } ) } ),
+
     // ── AI ────────────────────────────────────────────────────────────────────
     aiGenerateSection: ( sectionType, prompt ) =>
         request( 'ai/generate-section', { method: 'POST', body: JSON.stringify( { section_type: sectionType, prompt } ) } ),

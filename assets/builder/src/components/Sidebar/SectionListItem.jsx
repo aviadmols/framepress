@@ -2,8 +2,15 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS }         from '@dnd-kit/utilities';
 import { useBuilder }  from '../../context/BuilderContext';
 
+const CodeIcon = () => (
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+        <path d="M3.5 4L1 6l2.5 2M8.5 4L11 6l-2.5 2M7 2.5l-2 7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+);
+
 export default function SectionListItem( { section, schema, isElementorEmbed = false } ) {
     const { state, dispatch } = useBuilder();
+    const isCodeEditing = state.editingCodeSectionType === section.type;
     const isSelected          = state.selectedSectionId === section.id;
 
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable( {
@@ -49,6 +56,18 @@ export default function SectionListItem( { section, schema, isElementorEmbed = f
                     title={ section.enabled ? 'Hide section' : 'Show section' }
                 >
                     { section.enabled ? '●' : '○' }
+                </button>
+
+                {/* Edit Code button */}
+                <button
+                    className={ `fp-section-item__code-btn${ isCodeEditing ? ' fp-section-item__code-btn--active' : '' }` }
+                    onClick={ () => dispatch( isCodeEditing
+                        ? { type: 'CLOSE_CODE_EDITOR' }
+                        : { type: 'OPEN_CODE_EDITOR', sectionType: section.type }
+                    ) }
+                    title="Edit section code"
+                >
+                    <CodeIcon />
                 </button>
 
                 {/* Delete — not for Elementor embed (single fixed instance) */}

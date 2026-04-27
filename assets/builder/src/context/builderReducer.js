@@ -1,21 +1,22 @@
 import { generateId } from '../utils/generateId';
 
 export const initialState = {
-    sections:          [],
-    selectedSectionId: null,
-    selectedBlockId:   null,
-    schemas:           [],
-    blockSchemas:      [],
-    globalSettings:    {},
-    globalSchema:      null,
-    globalGoogleFonts: [],
-    isDirty:           false,
-    isSaving:          false,
-    saveError:         null,
-    previewMode:       'desktop',   // 'desktop' | 'mobile'
-    context:           'page',      // 'page' | 'header' | 'footer'
-    postId:            null,
-    previewReady:      false,
+    sections:                [],
+    selectedSectionId:       null,
+    selectedBlockId:         null,
+    schemas:                 [],
+    blockSchemas:            [],
+    globalSettings:          {},
+    globalSchema:            null,
+    globalGoogleFonts:       [],
+    isDirty:                 false,
+    isSaving:                false,
+    saveError:               null,
+    previewMode:             'desktop',   // 'desktop' | 'mobile'
+    context:                 'page',      // 'page' | 'header' | 'footer'
+    postId:                  null,
+    previewReady:            false,
+    editingCodeSectionType:  null,
 };
 
 export function builderReducer( state, action ) {
@@ -49,6 +50,12 @@ export function builderReducer( state, action ) {
 
         case 'DESELECT':
             return { ...state, selectedSectionId: null, selectedBlockId: null };
+
+        case 'OPEN_CODE_EDITOR':
+            return { ...state, editingCodeSectionType: action.sectionType };
+
+        case 'CLOSE_CODE_EDITOR':
+            return { ...state, editingCodeSectionType: null };
 
         case 'SELECT_BLOCK':
             return { ...state, selectedBlockId: action.id };

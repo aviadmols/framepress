@@ -3,7 +3,26 @@
     "allow": [
       "Bash(npm run *)",
       "Bash(git add *)",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "Bash(powershell -Command ' *)",
+      "Bash(git -C \"c:/Users/user/Desktop/Projects/FramePress\" push origin master)",
+      "Bash(php -l framepress.php)",
+      "Bash(xargs php *)",
+      "Bash(git push *)",
+      "Bash(git -C \"C:/Users/user/Desktop/Projects/FramePress\" status)",
+      "Bash(git -C \"C:/Users/user/Desktop/Projects/FramePress\" diff includes/class-elementor-widget.php)",
+      "Bash(git -C \"C:/Users/user/Desktop/Projects/FramePress\" push origin master)",
+      "Read(//c/Users/user/Desktop/Projects/FigmaProject/**)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\user\\Desktop\\Projects\\FigmaProject\\sections-export\\sela-engine-src",
+      "C:\\Users\\user\\Desktop\\Projects\\FigmaProject\\sections-export\\sela-experts-src",
+      "C:\\Users\\user\\Desktop\\Projects\\FigmaProject\\sections-export\\sela-products-src",
+      "C:\\Users\\user\\Desktop\\Projects\\FigmaProject\\sections-export\\sela-cases-src",
+      "C:\\Users\\user\\Desktop\\Projects\\FigmaProject\\sections-export\\sela-testi-src",
+      "C:\\Users\\user\\Desktop\\Projects\\hero-platform\\app\\Jobs",
+      "C:\\Users\\user\\Desktop\\Projects\\hero-platform\\app\\Http\\Controllers\\Api",
+      "C:\\Users\\user\\Desktop\\Projects\\hero-platform\\wp-connector"
     ]
   }
 }
