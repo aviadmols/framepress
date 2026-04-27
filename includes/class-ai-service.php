@@ -701,19 +701,24 @@ HERO works exactly like Shopify Themes — each section is a folder with two req
      --fp-font-body, --fp-font-heading, --fp-btn-radius
 5. Wrap all section HTML in a single root element — the outer #hero-section-{id} wrapper is added automatically, do NOT add it yourself.
 6. style.css is optional — include it if the section needs non-trivial CSS. Use the section type as a BEM namespace (e.g. .fp-hero__title). Never use inline <style> tags inside section.php.
-7. All sections must be responsive (mobile-first, CSS Grid or Flexbox).
-8. DO NOT output <?php opening tags — they will be added automatically.
+7. For repeated UI items (cards, features, pricing tiers, steps, logos, testimonials), ALWAYS model them as blocks — never as numbered settings like item_1_title, item_2_title.
+8. If you use blocks, define both:
+     - 'blocks' => ['allowed' => ['your-block-type'], 'min' => 0, 'max' => N]
+     - 'block_types' => ['your-block-type' => ['label' => '...', 'settings' => [...]]]
+9. DO NOT invent legacy migration keys in AI output (like repeatable_migration). Those are manual migration-only config.
+10. All sections must be responsive (mobile-first, CSS Grid or Flexbox).
+11. DO NOT output <?php opening tags — they will be added automatically.
 
 ══ TYPOGRAPHY (mandatory) ════════════════════════════════════════════════════
 
-9.  ALWAYS use font-family: var(--fp-font-body) for body text, paragraphs, inputs, and buttons.
-10. ALWAYS use font-family: var(--fp-font-heading) for headings (h1–h4).
-11. NEVER hardcode any font name (e.g. 'Polin', 'Inter', 'Roboto', 'sans-serif') — always use the CSS variable.
-12. If the source HTML has @font-face: move it to style.css, but replace all font-family usage with var(--fp-font-body) or var(--fp-font-heading).
+12. ALWAYS use font-family: var(--fp-font-body) for body text, paragraphs, inputs, and buttons.
+13. ALWAYS use font-family: var(--fp-font-heading) for headings (h1–h4).
+14. NEVER hardcode any font name (e.g. 'Polin', 'Inter', 'Roboto', 'sans-serif') — always use the CSS variable.
+15. If the source HTML has @font-face: move it to style.css, but replace all font-family usage with var(--fp-font-body) or var(--fp-font-heading).
 
 ══ JAVASCRIPT & INTERACTIVITY ════════════════════════════════════════════════
 
-13. If the section needs JavaScript, output a <script> block at the BOTTOM of the section.php HTML (after all markup). Scope all logic inside an IIFE keyed to the section ID to avoid conflicts when multiple instances exist:
+16. If the section needs JavaScript, output a <script> block at the BOTTOM of the section.php HTML (after all markup). Scope all logic inside an IIFE keyed to the section ID to avoid conflicts when multiple instances exist:
     <script>
     (function() {
         var root = document.getElementById('<?php echo esc_attr( $section['id'] ); ?>');
@@ -721,20 +726,20 @@ HERO works exactly like Shopify Themes — each section is a folder with two req
         // all your JS here, use root.querySelector(...) not document.querySelector(...)
     })();
     </script>
-14. Do NOT use inline onclick/onchange attributes — use addEventListener inside the script block.
-15. External CDN scripts (e.g. lottie-player): output a <script src="..."> tag BEFORE the section markup in section.php. Load it once using a flag if needed.
+17. Do NOT use inline onclick/onchange attributes — use addEventListener inside the script block.
+18. External CDN scripts (e.g. lottie-player): output a <script src="..."> tag BEFORE the section markup in section.php. Load it once using a flag if needed.
 
 ══ RTL & DIRECTION ══════════════════════════════════════════════════════════
 
-16. If the source HTML uses dir="rtl" or lang="he"/"ar", handle direction in style.css only:
+19. If the source HTML uses dir="rtl" or lang="he"/"ar", handle direction in style.css only:
     .fp-sectionslug { direction: rtl; text-align: right; }
     Do NOT add dir or lang attributes to HTML elements in section.php.
 
 ══ CSS VARIABLES FROM SOURCE HTML ════════════════════════════════════════════
 
-17. If the source HTML defines :root { --custom-var: value; }, move those variables into style.css scoped to the section BEM class: .fp-sectionslug { --custom-var: value; }
-18. If a source CSS variable maps logically to a schema color/number field, expose it as a schema setting instead (so the user can edit it). Otherwise keep it as a local variable in style.css.
-19. NEVER output a <style> tag inside section.php.
+20. If the source HTML defines :root { --custom-var: value; }, move those variables into style.css scoped to the section BEM class: .fp-sectionslug { --custom-var: value; }
+21. If a source CSS variable maps logically to a schema color/number field, expose it as a schema setting instead (so the user can edit it). Otherwise keep it as a local variable in style.css.
+22. NEVER output a <style> tag inside section.php.
 
 ══ SCHEMA FIELD TYPES ═════════════════════════════════════════════════════════
 

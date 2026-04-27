@@ -48,15 +48,11 @@ class Hero_Section_Assets {
     /**
      * Enqueue style/script for a single section type (e.g. Elementor widget output).
      *
-     * Section CSS load order is critical for theme override behavior:
-     *   - Default path: depends on the active theme's main stylesheet (when
-     *     detectable) so WP topologically prints theme CSS first, section CSS
-     *     after. Combined with priority 999 on wp_enqueue_scripts (registered
-     *     in framepress.php), this beats theme rules of equal specificity.
-     *   - Opt-in: a schema may declare `'css_priority' => 'after-everything'`
-     *     to bypass the enqueue queue entirely and emit the <link> tag at the
-     *     very end of wp_head (priority 9999), so it lands after every
-     *     enqueued style — including late-registered plugin/builder CSS.
+     * Section CSS is scoped to the section wrapper class before output. That
+     * keeps section files from leaking globally and gives them enough
+     * specificity to beat broad theme reset rules such as `input[type=text]`.
+     * A schema may still declare `'css_priority' => 'after-everything'` to
+     * emit the scoped CSS at the very end of wp_head.
      */
     public function enqueue_one_section_type( string $type ): void {
         $schema = $this->registry->get_section( $type );
@@ -83,8 +79,12 @@ class Hero_Section_Assets {
         if ( file_exists( $css_file ) ) {
             $css_priority = (string) ( $schema['css_priority'] ?? '' );
 
-            if ( $css_priority === 'after-everything' ) {
-                $this->emit_late_section_css( $type, $section_url, $css_file );
+            $scoped_css = $this->get_scoped_section_css( $type, $css_file );
+
+            if ( $scoped_css === '' ) {
+                // Keep going so script.js can still be enqueued for this section.
+            } elseif ( $css_priority === 'after-everything' ) {
+                $this->emit_late_section_css( $type, $scoped_css );
             } else {
                 $deps = [ 'hero-frontend' ];
                 $theme_handle = $this->detect_theme_style_handle();
@@ -92,11 +92,17 @@ class Hero_Section_Assets {
                     $deps[] = $theme_handle;
                 }
 
-                wp_enqueue_style(
-                    'hero-section-' . $type,
-                    $section_url . 'style.css',
+                $handle = 'hero-section-' . $type;
+                wp_register_style(
+                    $handle,
+                    false,
                     $deps,
                     (string) filemtime( $css_file )
+                );
+                wp_enqueue_style( $handle );
+                wp_add_inline_style(
+                    $handle,
+                    $scoped_css
                 );
             }
         }
@@ -111,6 +117,65 @@ class Hero_Section_Assets {
                 true
             );
         }
+    }
+
+    public function get_scoped_section_css( string $type, string $css_file ): string {
+        if ( ! file_exists( $css_file ) ) {
+            return '';
+        }
+
+        $css = (string) file_get_contents( $css_file );
+        if ( trim( $css ) === '' ) {
+            return '';
+        }
+
+        return $this->renderer->scope_css_to_selector(
+            $css,
+            '.hero-section--' . sanitize_html_class( $type )
+        );
+    }
+
+    /**
+     * Resolve the public URL for a section script.js file.
+     */
+    public function get_section_script_url( string $type ): ?string {
+        $schema = $this->registry->get_section( $type );
+        if ( ! $schema ) {
+            return null;
+        }
+
+        $section_path = trailingslashit( $schema['_path'] );
+        $script_file  = $section_path . 'script.js';
+        if ( ! file_exists( $script_file ) ) {
+            return null;
+        }
+
+        $section_url = $this->path_to_url( $section_path, $schema['_source'] ?? 'plugin' );
+
+        return $section_url . 'script.js?v=' . filemtime( $script_file );
+    }
+
+    /**
+     * Resolve scoped CSS and script URLs for preview REST responses.
+     */
+    public function get_section_preview_assets( string $type ): array {
+        $schema = $this->registry->get_section( $type );
+        if ( ! $schema ) {
+            return [
+                'style_css'  => '',
+                'style_id'   => '',
+                'script_url' => null,
+            ];
+        }
+
+        $section_path = trailingslashit( $schema['_path'] );
+        $css_file     = $section_path . 'style.css';
+
+        return [
+            'style_css'  => $this->get_scoped_section_css( $type, $css_file ),
+            'style_id'   => 'hero-section-' . sanitize_key( $type ) . '-scoped-css',
+            'script_url' => $this->get_section_script_url( $type ),
+        ];
     }
 
     /**
@@ -136,22 +201,18 @@ class Hero_Section_Assets {
     }
 
     /**
-     * Emit a hard <link rel="stylesheet"> at the very end of wp_head so the
-     * section's CSS is loaded after every other enqueued stylesheet on the
-     * page — including late-registered plugin and builder CSS.
+     * Emit scoped CSS at the very end of wp_head so the section styles land
+     * after every other enqueued stylesheet on the page.
      *
      * Triggered by setting `'css_priority' => 'after-everything'` on a
      * section's schema.
      */
-    private function emit_late_section_css( string $type, string $section_url, string $css_file ): void {
-        $href    = $section_url . 'style.css';
-        $version = (string) filemtime( $css_file );
-
-        add_action( 'wp_head', static function () use ( $type, $href, $version ): void {
+    private function emit_late_section_css( string $type, string $scoped_css ): void {
+        add_action( 'wp_head', static function () use ( $type, $scoped_css ): void {
             printf(
-                '<link rel="stylesheet" id="hero-section-%s-late-css" href="%s" />' . "\n",
+                '<style id="hero-section-%s-late-css">%s</style>' . "\n",
                 esc_attr( $type ),
-                esc_url( add_query_arg( 'ver', $version, $href ) )
+                $scoped_css // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- CSS is sanitized by scoping and loaded from trusted section files.
             );
         }, 9999 );
     }

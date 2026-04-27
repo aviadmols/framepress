@@ -380,40 +380,233 @@ class Hero_Section_Renderer {
     /**
      * Scope all CSS rules to a unique section wrapper ID.
      *
-     * Handles basic cases:
-     *   .foo { ... }          →  #hero-section-{id} .foo { ... }
-     *   .foo, .bar { ... }    →  #hero-section-{id} .foo, #hero-section-{id} .bar { ... }
-     *   @media (...) { ... }  →  kept as-is, inner rules scoped
-     *
      * Strips </style> injection attempts.
      */
     public function scope_css( string $css, string $section_id ): string {
-        // Prevent </style> injection.
-        $css    = str_ireplace( '</style>', '', $css );
-        $prefix = '#hero-section-' . $section_id;
+        return $this->scope_css_to_selector( $css, '#hero-section-' . $section_id );
+    }
 
-        // Very lightweight regex-based scoping for non-at-rule blocks.
-        // This covers the 95% case without a full CSS parser.
-        $scoped = preg_replace_callback(
-            '/([^{@]+)\{([^}]*)\}/s',
-            static function ( array $m ) use ( $prefix ): string {
-                $selectors = explode( ',', $m[1] );
-                $scoped_selectors = array_map( static function ( string $sel ) use ( $prefix ): string {
-                    $sel = trim( $sel );
-                    if ( $sel === '' ) {
-                        return $sel;
+    /**
+     * Scope CSS rules to a wrapper selector (for example `.hero-section--faq`).
+     *
+     * This keeps per-section style.css rules inside the section wrapper and
+     * increases specificity enough to beat broad theme reset rules such as
+     * `input[type=text]`.
+     */
+    public function scope_css_to_selector( string $css, string $scope_selector ): string {
+        $css            = str_ireplace( '</style>', '', $css );
+        $scope_selector = trim( $scope_selector );
+
+        if ( $css === '' || $scope_selector === '' ) {
+            return $css;
+        }
+
+        return $this->scope_css_blocks( $css, $scope_selector );
+    }
+
+    private function scope_css_blocks( string $css, string $scope_selector ): string {
+        $out    = '';
+        $offset = 0;
+        $len    = strlen( $css );
+
+        while ( $offset < $len ) {
+            $open = strpos( $css, '{', $offset );
+            if ( $open === false ) {
+                $out .= substr( $css, $offset );
+                break;
+            }
+
+            $close = $this->find_matching_css_brace( $css, $open );
+            if ( $close === null ) {
+                $out .= substr( $css, $offset );
+                break;
+            }
+
+            $prelude = substr( $css, $offset, $open - $offset );
+            $body    = substr( $css, $open + 1, $close - $open - 1 );
+            [ $leading, $selector ] = $this->split_css_leading_noise( $prelude );
+            $trimmed_selector       = trim( $selector );
+
+            if ( $trimmed_selector !== '' && str_starts_with( $trimmed_selector, '@' ) ) {
+                $at_rule = strtolower( strtok( substr( $trimmed_selector, 1 ), " \t\r\n(" ) ?: '' );
+                if ( in_array( $at_rule, [ 'media', 'supports', 'container', 'layer' ], true ) ) {
+                    $body = $this->scope_css_blocks( $body, $scope_selector );
+                }
+                $out .= $leading . $selector . '{' . $body . '}';
+            } elseif ( $trimmed_selector !== '' ) {
+                $out .= $leading . $this->scope_selector_list( $selector, $scope_selector ) . '{' . $body . '}';
+            } else {
+                $out .= $prelude . '{' . $body . '}';
+            }
+
+            $offset = $close + 1;
+        }
+
+        return $out;
+    }
+
+    private function find_matching_css_brace( string $css, int $open ): ?int {
+        $depth = 0;
+        $len   = strlen( $css );
+
+        for ( $i = $open; $i < $len; $i++ ) {
+            if ( substr( $css, $i, 2 ) === '/*' ) {
+                $comment_end = strpos( $css, '*/', $i + 2 );
+                if ( $comment_end === false ) {
+                    return null;
+                }
+                $i = $comment_end + 1;
+                continue;
+            }
+
+            $char = $css[ $i ];
+            if ( $char === '"' || $char === "'" ) {
+                $quote = $char;
+                for ( $i++; $i < $len; $i++ ) {
+                    if ( $css[ $i ] === '\\' ) {
+                        $i++;
+                        continue;
                     }
-                    // Don't double-scope if already scoped.
-                    if ( str_starts_with( $sel, $prefix ) ) {
-                        return $sel;
+                    if ( $css[ $i ] === $quote ) {
+                        break;
                     }
-                    return $prefix . ' ' . $sel;
-                }, $selectors );
-                return implode( ', ', $scoped_selectors ) . ' {' . $m[2] . '}';
-            },
-            $css
+                }
+                continue;
+            }
+
+            if ( $char === '{' ) {
+                $depth++;
+            } elseif ( $char === '}' ) {
+                $depth--;
+                if ( $depth === 0 ) {
+                    return $i;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Keep whitespace/comments before a selector untouched.
+     *
+     * @return array{0:string,1:string}
+     */
+    private function split_css_leading_noise( string $prelude ): array {
+        $offset = 0;
+        $len    = strlen( $prelude );
+
+        while ( $offset < $len ) {
+            if ( preg_match( '/\G\s+/A', $prelude, $m, 0, $offset ) ) {
+                $offset += strlen( $m[0] );
+                continue;
+            }
+
+            if ( substr( $prelude, $offset, 2 ) === '/*' ) {
+                $comment_end = strpos( $prelude, '*/', $offset + 2 );
+                if ( $comment_end === false ) {
+                    break;
+                }
+                $offset = $comment_end + 2;
+                continue;
+            }
+
+            break;
+        }
+
+        return [ substr( $prelude, 0, $offset ), substr( $prelude, $offset ) ];
+    }
+
+    private function scope_selector_list( string $selector_list, string $scope_selector ): string {
+        $selectors = $this->split_css_selector_list( $selector_list );
+        $scoped    = array_map(
+            fn ( string $selector ): string => $this->scope_single_selector( $selector, $scope_selector ),
+            $selectors
         );
 
-        return $scoped ?? $css;
+        return implode( ', ', $scoped );
+    }
+
+    /**
+     * Split selector lists without breaking commas inside :is(), :not(), etc.
+     *
+     * @return string[]
+     */
+    private function split_css_selector_list( string $selector_list ): array {
+        $parts       = [];
+        $current     = '';
+        $paren_depth = 0;
+        $bracket_depth = 0;
+        $quote       = null;
+        $len         = strlen( $selector_list );
+
+        for ( $i = 0; $i < $len; $i++ ) {
+            $char = $selector_list[ $i ];
+
+            if ( $quote !== null ) {
+                $current .= $char;
+                if ( $char === '\\' && $i + 1 < $len ) {
+                    $current .= $selector_list[ ++$i ];
+                    continue;
+                }
+                if ( $char === $quote ) {
+                    $quote = null;
+                }
+                continue;
+            }
+
+            if ( $char === '"' || $char === "'" ) {
+                $quote = $char;
+                $current .= $char;
+                continue;
+            }
+
+            if ( $char === '(' ) {
+                $paren_depth++;
+            } elseif ( $char === ')' && $paren_depth > 0 ) {
+                $paren_depth--;
+            } elseif ( $char === '[' ) {
+                $bracket_depth++;
+            } elseif ( $char === ']' && $bracket_depth > 0 ) {
+                $bracket_depth--;
+            }
+
+            if ( $char === ',' && $paren_depth === 0 && $bracket_depth === 0 ) {
+                $parts[] = $current;
+                $current = '';
+                continue;
+            }
+
+            $current .= $char;
+        }
+
+        $parts[] = $current;
+
+        return $parts;
+    }
+
+    private function scope_single_selector( string $selector, string $scope_selector ): string {
+        $leading = '';
+        $trailing = '';
+
+        if ( preg_match( '/^(\s*)(.*?)(\s*)$/s', $selector, $m ) ) {
+            $leading  = $m[1];
+            $selector = $m[2];
+            $trailing = $m[3];
+        }
+
+        if ( $selector === '' || str_starts_with( $selector, $scope_selector ) ) {
+            return $leading . $selector . $trailing;
+        }
+
+        if ( $selector === ':root' || $selector === 'html' || $selector === 'body' ) {
+            return $leading . $scope_selector . $trailing;
+        }
+
+        if ( str_starts_with( $selector, '&' ) ) {
+            return $leading . $scope_selector . substr( $selector, 1 ) . $trailing;
+        }
+
+        return $leading . $scope_selector . ' ' . $selector . $trailing;
     }
 }

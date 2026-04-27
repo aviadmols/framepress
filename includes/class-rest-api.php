@@ -291,7 +291,10 @@ class Hero_Rest_API {
         $post_id  = (int) $request->get_param( 'id' );
         $raw      = get_post_meta( $post_id, '_hero_sections', true );
         $sections = $raw ? json_decode( $raw, true ) : [];
-        return rest_ensure_response( is_array( $sections ) ? $sections : [] );
+        if ( ! is_array( $sections ) ) {
+            return rest_ensure_response( [] );
+        }
+        return rest_ensure_response( $this->sanitize_sections( $sections ) );
     }
 
     public function save_page_sections( \WP_REST_Request $request ): \WP_REST_Response {
@@ -314,7 +317,10 @@ class Hero_Rest_API {
     public function get_header( \WP_REST_Request $request ): \WP_REST_Response {
         $raw      = get_option( 'hero_header', '[]' );
         $sections = json_decode( $raw, true );
-        return rest_ensure_response( is_array( $sections ) ? $sections : [] );
+        if ( ! is_array( $sections ) ) {
+            return rest_ensure_response( [] );
+        }
+        return rest_ensure_response( $this->sanitize_sections( $sections ) );
     }
 
     public function save_header( \WP_REST_Request $request ): \WP_REST_Response {
@@ -331,7 +337,10 @@ class Hero_Rest_API {
     public function get_footer( \WP_REST_Request $request ): \WP_REST_Response {
         $raw      = get_option( 'hero_footer', '[]' );
         $sections = json_decode( $raw, true );
-        return rest_ensure_response( is_array( $sections ) ? $sections : [] );
+        if ( ! is_array( $sections ) ) {
+            return rest_ensure_response( [] );
+        }
+        return rest_ensure_response( $this->sanitize_sections( $sections ) );
     }
 
     public function save_footer( \WP_REST_Request $request ): \WP_REST_Response {
@@ -386,8 +395,11 @@ class Hero_Rest_API {
         }
 
         $data['type'] = $section_type;
-
-        return rest_ensure_response( [ 'sections' => [ $data ] ] );
+        $clean = $this->sanitize_sections( [ $data ] );
+        if ( empty( $clean ) ) {
+            return new \WP_REST_Response( [ 'error' => 'Unknown section type' ], 400 );
+        }
+        return rest_ensure_response( [ 'sections' => [ $clean[0] ] ] );
     }
 
     /**
@@ -513,8 +525,19 @@ class Hero_Rest_API {
             default   => str_replace( HERO_DIR, HERO_URL, $path ),
         };
 
+        $style_file = $path . 'style.css';
+        $style_css  = '';
+        if ( file_exists( $style_file ) ) {
+            $style_css = $this->renderer->scope_css_to_selector(
+                (string) file_get_contents( $style_file ),
+                '.hero-section--' . sanitize_html_class( $type )
+            );
+        }
+
         return [
-            'style_url'  => file_exists( $path . 'style.css'  ) ? $base_url . 'style.css?v='  . filemtime( $path . 'style.css'  ) : null,
+            'style_url'  => null,
+            'style_css'  => $style_css,
+            'style_id'   => 'hero-section-' . sanitize_key( $type ) . '-scoped-css',
             'script_url' => file_exists( $path . 'script.js'  ) ? $base_url . 'script.js?v='  . filemtime( $path . 'script.js'  ) : null,
         ];
     }
@@ -904,7 +927,10 @@ class Hero_Rest_API {
             "        [ 'id' => 'title',   'type' => 'text',     'label' => 'Title',   'default' => '{$label_escaped}' ],",
             "        [ 'id' => 'content', 'type' => 'textarea', 'label' => 'Content', 'default' => '' ],",
             '    ],',
-            "    'blocks' => [],",
+            "    'blocks' => [",
+            "        'allowed' => [],",
+            "        'max'     => 0,",
+            "    ],",
             '];',
             '',
         ] );
@@ -925,6 +951,10 @@ class Hero_Rest_API {
             "    <?php if ( \$content ) : ?>",
             "        <div class=\"fp-{$slug}__content\"><?php echo \$content; ?></div>",
             "    <?php endif; ?>",
+            "    <?php foreach ( \$blocks as \$block ) : ?>",
+            "        <?php if ( ! is_array( \$block['settings'] ?? null ) ) continue; ?>",
+            "        <div class=\"fp-{$slug}__block\"><?php echo esc_html( \$block['settings']['title'] ?? '' ); ?></div>",
+            "    <?php endforeach; ?>",
             '</div>',
             '',
         ] );
@@ -1252,18 +1282,110 @@ class Hero_Rest_API {
 
     private function sanitize_section_instance( array $inst ): ?array {
         $type = sanitize_title( $inst['type'] ?? '' );
-        if ( ! $type || ! $this->section_registry->get_section( $type ) ) {
+        $schema = $this->section_registry->get_section( $type );
+        if ( ! $type || ! $schema ) {
             return null;
         }
+
+        $settings = $this->sanitize_settings_values( $inst['settings'] ?? [] );
+        $blocks   = $this->sanitize_blocks( $inst['blocks'] ?? [] );
+
+        [ $settings, $blocks ] = $this->migrate_repeatable_settings_to_blocks(
+            $settings,
+            $blocks,
+            $schema
+        );
 
         return [
             'id'         => sanitize_text_field( $inst['id'] ?? wp_generate_uuid4() ),
             'type'       => $type,
-            'settings'   => $this->sanitize_settings_values( $inst['settings'] ?? [] ),
-            'blocks'     => $this->sanitize_blocks( $inst['blocks'] ?? [] ),
+            'settings'   => $settings,
+            'blocks'     => $blocks,
             'custom_css' => str_ireplace( '</style>', '', wp_unslash( (string) ( $inst['custom_css'] ?? '' ) ) ),
             'enabled'    => isset( $inst['enabled'] ) ? (bool) $inst['enabled'] : true,
         ];
+    }
+
+    /**
+     * Optional legacy migration:
+     * Convert numbered settings (e.g. card_1_title) into repeatable blocks.
+     *
+     * Opt-in via schema key:
+     * 'repeatable_migration' => [
+     *   'prefix'     => 'card',
+     *   'block_type' => 'product',
+     *   'field_map'  => [ 'name' => 'name', 'desc' => 'description' ],
+     *   'max'        => 12,
+     * ]
+     */
+    private function migrate_repeatable_settings_to_blocks( array $settings, array $blocks, array $schema ): array {
+        if ( ! empty( $blocks ) ) {
+            return [ $settings, $blocks ];
+        }
+
+        $migration = $schema['repeatable_migration'] ?? null;
+        if ( ! is_array( $migration ) ) {
+            return [ $settings, $blocks ];
+        }
+
+        $prefix      = sanitize_key( (string) ( $migration['prefix'] ?? '' ) );
+        $block_type  = sanitize_title( (string) ( $migration['block_type'] ?? '' ) );
+        $field_map   = is_array( $migration['field_map'] ?? null ) ? $migration['field_map'] : [];
+        $max         = max( 1, min( 100, (int) ( $migration['max'] ?? 20 ) ) );
+        $allowed     = is_array( $schema['blocks']['allowed'] ?? null ) ? $schema['blocks']['allowed'] : [];
+        $block_types = is_array( $schema['block_types'] ?? null ) ? $schema['block_types'] : [];
+
+        if ( $prefix === '' || $block_type === '' || empty( $field_map ) ) {
+            return [ $settings, $blocks ];
+        }
+        if ( ! in_array( $block_type, $allowed, true ) || ! isset( $block_types[ $block_type ] ) ) {
+            return [ $settings, $blocks ];
+        }
+
+        $migrated = [];
+        for ( $i = 1; $i <= $max; $i++ ) {
+            $row      = [];
+            $has_data = false;
+
+            foreach ( $field_map as $legacy_key => $block_field_id ) {
+                $legacy_key     = sanitize_key( (string) $legacy_key );
+                $block_field_id = sanitize_key( (string) $block_field_id );
+                if ( $legacy_key === '' || $block_field_id === '' ) {
+                    continue;
+                }
+
+                $old_key = $prefix . '_' . $i . '_' . $legacy_key;
+                if ( ! array_key_exists( $old_key, $settings ) ) {
+                    continue;
+                }
+
+                $value = $settings[ $old_key ];
+                unset( $settings[ $old_key ] );
+                $row[ $block_field_id ] = $value;
+
+                if ( is_array( $value ) ) {
+                    $has_data = $has_data || ! empty( $value );
+                } elseif ( is_string( $value ) ) {
+                    $has_data = $has_data || trim( $value ) !== '';
+                } else {
+                    $has_data = $has_data || ( $value !== null && $value !== false );
+                }
+            }
+
+            if ( $has_data ) {
+                $migrated[] = [
+                    'id'       => wp_generate_uuid4(),
+                    'type'     => $block_type,
+                    'settings' => $row,
+                ];
+            }
+        }
+
+        if ( empty( $migrated ) ) {
+            return [ $settings, $blocks ];
+        }
+
+        return [ $settings, $this->sanitize_blocks( $migrated ) ];
     }
 
     private function sanitize_settings_values( array $settings ): array {

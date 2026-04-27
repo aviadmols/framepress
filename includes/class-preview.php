@@ -332,6 +332,18 @@ class Hero_Preview {
                 }
             }
 
+            function injectInlineStyle(id, css) {
+                if (!css) return;
+                id = id || 'hero-section-scoped-css';
+                var style = document.getElementById(id);
+                if (!style) {
+                    style = document.createElement('style');
+                    style.id = id;
+                    document.head.appendChild(style);
+                }
+                style.textContent = css;
+            }
+
             /**
              * Fetch rendered HTML for a section instance from the PHP renderer.
              */
@@ -348,6 +360,7 @@ class Hero_Preview {
                 .then(function(data) {
                     // Inject section CSS / JS if returned and not yet loaded.
                     if (data.assets) {
+                        injectInlineStyle(data.assets.style_id, data.assets.style_css);
                         injectAsset(data.assets.style_url,  'style');
                         injectAsset(data.assets.script_url, 'script');
                     }

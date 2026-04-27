@@ -57,22 +57,6 @@ window.heroSMData = <?php echo wp_json_encode( [
 				</div>
 			</div>
 
-			<div class="fps-sfe-preview-panel">
-				<div class="fps-sfe-preview-head">
-					<div class="fps-sfe-preview-head-left">
-						<strong><?php esc_html_e( 'Live preview', 'hero' ); ?></strong>
-						<span id="fps-sfe-preview-status" class="fps-sfe-preview-status"></span>
-					</div>
-					<div class="fps-sfe-device-btns" role="group" aria-label="<?php esc_attr_e( 'Preview width', 'hero' ); ?>">
-						<button type="button" class="button fps-sfe-device-btn fps-sfe-device-btn--active" data-device="desktop"><?php esc_html_e( 'Desktop', 'hero' ); ?></button>
-						<button type="button" class="button fps-sfe-device-btn" data-device="mobile"><?php esc_html_e( 'Mobile', 'hero' ); ?></button>
-					</div>
-				</div>
-				<div class="fps-sfe-preview-viewport fps-sfe-preview-viewport--desktop" id="fps-sfe-preview-viewport">
-					<iframe id="fps-sfe-preview-frame" class="fps-sfe-preview-frame" title="<?php esc_attr_e( 'Section preview', 'hero' ); ?>"></iframe>
-				</div>
-			</div>
-
 			<div class="fps-sfe-code-panel" id="fps-sfe-code-panel">
 				<div class="fps-sfe-code-panel-bar">
 					<span class="fps-sfe-code-panel-label"><?php esc_html_e( 'Sources', 'hero' ); ?></span>
@@ -102,49 +86,28 @@ window.heroSMData = <?php echo wp_json_encode( [
 .fps-sfe-title { margin: 0; font-size: 20px; }
 .fps-sfe-shell { border: 1px solid #c3c4c7; border-radius: 4px; background: #fff; min-height: 100vh; display: flex; flex-direction: column; }
 .fps-sfe-loading { padding: 24px; color: #646970; margin: 0; }
-/* Reserve space so preview/head are not covered by the fixed code panel. */
-.fps-sfe-editor-root { display: flex; flex-direction: column; flex: 1; min-height: 0; height: 100%; padding-bottom: min(50vh, 520px); box-sizing: border-box; }
+/* Full-height editor layout. */
+.fps-sfe-editor-root { display: flex; flex-direction: column; flex: 1; min-height: 0; height: 100%; box-sizing: border-box; }
 .fps-sfe-editor-head { flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; padding: 8px 16px; border-bottom: 1px solid #c3c4c7; flex-wrap: wrap; gap: 8px; }
 .fps-sfe-meta { display: flex; align-items: center; gap: 10px; }
 .fps-sfe-slug { font-size: 12px; background: #f0f0f1; padding: 2px 8px; border-radius: 3px; }
 .fps-sfe-actions { display: flex; align-items: center; gap: 10px; }
-.fps-sfe-preview-panel { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; background: #f0f0f0; border-bottom: 1px solid #c3c4c7; }
-.fps-sfe-preview-head { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 6px 12px; font-size: 12px; color: #50575e; background: #f6f7f7; border-bottom: 1px solid #dcdcde; }
-.fps-sfe-preview-head-left { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.fps-sfe-preview-status { font-size: 11px; color: #787c82; }
-.fps-sfe-device-btns { display: inline-flex; gap: 0; }
-.fps-sfe-device-btns .button { border-radius: 0; margin: 0 -1px 0 0; box-shadow: none; }
-.fps-sfe-device-btns .button:first-of-type { border-top-left-radius: 3px; border-bottom-left-radius: 3px; }
-.fps-sfe-device-btns .button:last-of-type { border-top-right-radius: 3px; border-bottom-right-radius: 3px; margin-right: 0; }
-.fps-sfe-device-btns .fps-sfe-device-btn--active { background: #2271b1; color: #fff; border-color: #2271b1; }
-.fps-sfe-preview-viewport { flex: 1; min-height: 0; min-width: 0; display: flex; justify-content: center; align-items: flex-start; background: #e8e8e8; }
-.fps-sfe-preview-viewport--desktop { align-items: stretch; padding: 0; overflow: hidden; }
-.fps-sfe-preview-viewport--mobile { align-items: flex-start; justify-content: center; padding: 12px 8px; overflow: auto; }
-.fps-sfe-preview-viewport--desktop .fps-sfe-preview-frame { width: 100%; max-width: none; min-height: 0; height: 100%; flex: 1 1 auto; align-self: stretch; box-shadow: none; border: 0; }
-.fps-sfe-preview-viewport--mobile .fps-sfe-preview-frame { width: 390px; max-width: 100%; min-height: 480px; height: min(70vh, 900px); flex: 0 0 auto; background: #fff; border: 0; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,.12); }
-.fps-sfe-preview-frame { display: block; }
-/* Sticky to viewport bottom (DevTools-style); stays visible while the admin page scrolls. */
+/* Fill all available editor space. */
 .fps-sfe-code-panel {
-	position: fixed;
-	z-index: 100050;
-	bottom: 0;
-	left: 180px; /* #adminmenuwrap 160px + small gutter */
-	right: 24px;
+	position: relative;
+	z-index: 1;
+	flex: 1 1 auto;
+	align-self: stretch;
 	min-width: 0;
-	min-height: 280px;
-	max-height: 50vh;
-	width: auto;
+	min-height: 0;
+	max-height: none;
+	width: 100%;
 	display: flex;
 	flex-direction: column;
 	background: #fff;
-	border: 1px solid #c3c4c7;
-	border-bottom: none;
-	border-radius: 6px 6px 0 0;
-	box-shadow: 0 -6px 24px rgba(0,0,0,.12);
-}
-body.folded .fps-sfe-code-panel { left: 56px; }
-@media screen and (max-width: 782px) {
-	.fps-sfe-code-panel { left: 12px; right: 12px; }
+	border: none;
+	border-radius: 0;
+	box-shadow: none;
 }
 .fps-sfe-code-panel-bar { flex-shrink: 0; display: flex; flex-direction: column; background: #2b2b2b; border-top: none; }
 .fps-sfe-ai-panel { flex-shrink: 0; padding: 8px 12px 10px; background: #1e1e1e; border-bottom: 1px solid #3c434a; display: flex; flex-direction: column; gap: 6px; }
@@ -191,9 +154,6 @@ body.folded .fps-sfe-code-panel { left: 56px; }
 		dirtyFiles:          {},
 		cmEditor:            null,
 		cmMode:              null,
-		previewTimer:        null,
-		previewUrl:          null,
-		previewDevice:       'desktop',
 		cmResizeTimer:       null,
 		aiAssistAvailable:   false,
 	};
@@ -222,31 +182,10 @@ body.folded .fps-sfe-code-panel { left: 56px; }
 		dirty:     document.getElementById('fps-sfe-dirty'),
 		saveMsg:   document.getElementById('fps-sfe-save-msg'),
 		readonly:  document.getElementById('fps-sfe-readonly'),
-		viewport:  document.getElementById('fps-sfe-preview-viewport'),
-		iframe:    document.getElementById('fps-sfe-preview-frame'),
-		pvStatus:  document.getElementById('fps-sfe-preview-status'),
 		aiInstruction: document.getElementById('fps-sfe-ai-instruction'),
 		aiRun:     document.getElementById('fps-sfe-ai-run'),
 		aiStatus:  document.getElementById('fps-sfe-ai-status'),
 	};
-
-	function setPreviewDevice(device) {
-		state.previewDevice = (device === 'mobile') ? 'mobile' : 'desktop';
-		if (els.viewport) {
-			els.viewport.classList.remove('fps-sfe-preview-viewport--desktop', 'fps-sfe-preview-viewport--mobile');
-			els.viewport.classList.add(state.previewDevice === 'mobile' ? 'fps-sfe-preview-viewport--mobile' : 'fps-sfe-preview-viewport--desktop');
-		}
-		document.querySelectorAll('.fps-sfe-device-btn').forEach(function (btn) {
-			var on = (btn.getAttribute('data-device') || '') === state.previewDevice;
-			btn.classList.toggle('fps-sfe-device-btn--active', on);
-		});
-		try {
-			if (els.iframe && els.iframe.contentWindow) {
-				els.iframe.contentWindow.dispatchEvent(new Event('resize'));
-			}
-		} catch (e) { /* cross-origin or empty */ }
-		refreshCodeMirror();
-	}
 
 	function parseJsonResponse(res) {
 		return res.text().then(function (text) {
@@ -340,7 +279,7 @@ body.folded .fps-sfe-code-panel { left: 56px; }
 			ta.value = content;
 			ta.readOnly = !state.editable;
 			ta.style.minHeight = '300px';
-			ta.addEventListener('input', function () { markDirty(); schedulePreview(); });
+			ta.addEventListener('input', function () { markDirty(); });
 			els.editorArea.appendChild(ta);
 			state.cmEditor = { getValue: function () { return ta.value; }, isFallback: true, setValue: function (v) { ta.value = v; }, setOption: function () {}, refresh: function () {} };
 			return;
@@ -360,7 +299,6 @@ body.folded .fps-sfe-code-panel { left: 56px; }
 		state.cmEditor.setValue(content);
 		state.cmEditor.on('change', function () {
 			markDirty();
-			schedulePreview();
 		});
 		refreshCodeMirror();
 	}
@@ -373,43 +311,6 @@ body.folded .fps-sfe-code-panel { left: 56px; }
 		});
 		var content = state.fileContents[file] || '';
 		initOrUpdateCM(content, modeForFile(file));
-	}
-
-	function onPreviewIframeLoad() {
-		try {
-			if (els.iframe && els.iframe.contentWindow) {
-				els.iframe.contentWindow.dispatchEvent(new Event('resize'));
-			}
-		} catch (e) { /* ignore */ }
-	}
-
-	function schedulePreview() {
-		if (state.previewTimer) clearTimeout(state.previewTimer);
-		state.previewTimer = setTimeout(runPreview, 500);
-	}
-
-	function runPreview() {
-		flushCM();
-		var sp = state.fileContents['section.php'] !== undefined ? (state.fileContents['section.php'] || '') : '';
-		var ss = state.fileContents['style.css'] !== undefined ? (state.fileContents['style.css'] || '') : '';
-		els.pvStatus.textContent = '…';
-		apiFetch('/sections-manager/' + encodeURIComponent(SECTION_TYPE) + '/draft-preview', {
-			method: 'POST',
-			body: JSON.stringify({ section_php: sp, style_css: ss }),
-		}).then(function (data) {
-			var html = data.html || '';
-			var css = data.css || '';
-			var doc = '<!DOCTYPE html><html><head><meta charset="utf-8">'
-				+ '<meta name="viewport" content="width=device-width, initial-scale=1">'
-				+ '<style>' + css + '</style></head><body style="margin:0;background:#fff">' + html + '</body></html>';
-			var blob = new Blob([ doc ], { type: 'text/html;charset=utf-8' });
-			if (state.previewUrl) URL.revokeObjectURL(state.previewUrl);
-			state.previewUrl = URL.createObjectURL(blob);
-			els.iframe.src = state.previewUrl;
-			els.pvStatus.textContent = 'Updated';
-		}).catch(function (e) {
-			els.pvStatus.textContent = e.message || 'Error';
-		});
 	}
 
 	async function saveFiles() {
@@ -427,7 +328,6 @@ body.folded .fps-sfe-code-panel { left: 56px; }
 			els.saveMsg.className = 'fps-sm-save-notice fps-sm-save-notice--success';
 			els.saveMsg.hidden = false;
 			setTimeout(function () { els.saveMsg.hidden = true; }, 3000);
-			runPreview();
 		} catch (e) {
 			els.saveMsg.textContent = e.message;
 			els.saveMsg.className = 'fps-sm-save-notice fps-sm-save-notice--error';
@@ -475,8 +375,6 @@ body.folded .fps-sfe-code-panel { left: 56px; }
 		if (els.loading) els.loading.hidden = true;
 		els.root.hidden = false;
 		if (available.length) switchTab(available[0]);
-		else els.pvStatus.textContent = 'No files';
-		runPreview();
 		refreshCodeMirror();
 	}
 
@@ -502,7 +400,6 @@ body.folded .fps-sfe-code-panel { left: 56px; }
 		}).then(function (data) {
 			mergeAiFilesIntoState(data.files);
 			refreshCodeMirror();
-			schedulePreview();
 			if (els.aiStatus) {
 				var b = (data.brief && String(data.brief).trim()) ? String(data.brief).trim() : '<?php echo esc_js( __( 'Applied.', 'hero' ) ); ?>';
 				els.aiStatus.textContent = b;
@@ -522,13 +419,6 @@ body.folded .fps-sfe-code-panel { left: 56px; }
 	if (els.aiRun) {
 		els.aiRun.addEventListener('click', runAiAssist);
 	}
-	document.querySelectorAll('.fps-sfe-device-btn').forEach(function (btn) {
-		btn.addEventListener('click', function () {
-			var d = this.getAttribute('data-device') || 'desktop';
-			setPreviewDevice(d);
-		});
-	});
-	els.iframe.addEventListener('load', onPreviewIframeLoad);
 	window.addEventListener('beforeunload', function (e) {
 		if (hasDirty()) { e.preventDefault(); e.returnValue = ''; }
 	});
